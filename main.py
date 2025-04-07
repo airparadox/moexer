@@ -5,34 +5,27 @@ import os
 import requests
 import pandas as pd
 from dotenv import load_dotenv
-from langchain_gigachat import GigaChat
 from typing_extensions import TypedDict
 from langsmith import traceable
 from tpulse import TinkoffPulse
-from langchain_ollama import OllamaLLM
 import apimoex
-import feedparser  # Добавлено для работы с RSS
+import feedparser
+from openai import OpenAI
+from langgraph.graph import StateGraph, START, END
+from datetime import timezone
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 pulse = TinkoffPulse()
 load_dotenv()
-GIGACHAT_CREDENTIALS = os.getenv("GIGACHAT_CREDENTIALS")
-LLM_MODEL = os.getenv("LLM_MODEL", "GigaChat")
-LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0))
 
-# llm = OllamaLLM(model="qwen2.5:14b", temperature=LLM_TEMPERATURE)
-llm = GigaChat(
-    credentials=GIGACHAT_CREDENTIALS,
-    model=LLM_MODEL,
-    temperature=LLM_TEMPERATURE,
-    verify_ssl_certs=False
-)
+# Инициализация DeepSeek API
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+DEEPSEEK_MODEL = "deepseek-chat"
+client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
 
-
-
-# qwen2.5:14b
 class State(TypedDict):
     ticker: str
     quantity: int
@@ -42,44 +35,59 @@ class State(TypedDict):
     moex_data_analysis: str
     ifrs_data: str
     final_data: str
-    market_news: str  # Добавлено для общего новостного фона
+    market_news: str
 
 def has_only_ticker(text: str, ticker: str) -> bool:
     tickers = re.findall(r'\b[A-Z]{3,4}\b', text)
     return all(t == ticker for t in tickers) and tickers
 
+def call_deepseek(system_prompt: str, user_prompt: str) -> str:
+    """Унифицированный вызов DeepSeek API с поддержкой Context Caching"""
+    try:
+        response = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=1,
+            stream=False
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        logger.error(f"DeepSeek API error: {e}")
+        return "Ошибка анализа"
+
+
+
 @traceable
 def generate_market_news(state: State) -> dict:
     """Получение и анализ новостей с lenta.ru"""
     try:
-        # Парсинг RSS-ленты lenta.ru
         feed = feedparser.parse('https://lenta.ru/rss/news')
-        # Берем последние 10 новостей за сутки
         news_entries = []
-        from datetime import timezone  # Добавляем импорт
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=1)  # Добавляем UTC
+        # Устанавливаем временную зону UTC для корректного сравнения
+        cutoff_time = datetime.now(timezone.utc) - timedelta(days=1)
 
         for entry in feed.entries[:100]:
+            # Парсим дату публикации с учетом временной зоны
             pub_date = datetime.strptime(entry.published, '%a, %d %b %Y %H:%M:%S %z')
             if pub_date > cutoff_time:
                 news_entries.append(f"{entry.title}: {entry.summary}")
 
-        # Анализ новостей через LLM
         if news_entries:
-            analysis = llm.invoke(
-                f"Анализ новостей за сутки: {news_entries}\n"
-                "Оцени влияние на торговлю на Московской бирже:\n"
-                "1. Общий настрой (позитивный/негативный/нейтральный)\n"
-                "2. Ключевые факторы\n"
-                "3. Потенциальное влияние на индекс MOEX\n"
-                "Формат:\n1. Общий настрой\n2. Ключевые факторы\n3. Потенциальное влияние"
+            system_prompt = (
+                "Ты опытный аналитик финансовых рынков. Проанализируй новости и оцени их влияние на Московскую биржу. "
+                "Формат ответа:\n1. Общий настрой\n2. Ключевые факторы\n3. Потенциальное влияние"
             )
+            user_prompt = f"Новости за сутки:\n{news_entries}"
+
+            analysis = call_deepseek(system_prompt, user_prompt)
             return {"market_news": analysis}
         return {"market_news": "Недостаточно свежих новостей для анализа"}
     except Exception as e:
         logger.error(f"Market news error: {e}")
         return {"market_news": "Ошибка при анализе новостей"}
-
 @traceable
 def generate_news(state: State) -> dict:
     try:
@@ -95,11 +103,13 @@ def generate_news(state: State) -> dict:
 @traceable
 def grade_news(state: State) -> dict:
     try:
-        msg = llm.invoke(
-            f"Анализ новостей {state['ticker']}: {state['news']}\n"
-            "Оцени:\n1. Настрой\n2. Темы\n3. Перспективы\n4. Риски\n"
-            "Формат:\n1. Настрой\n2. Темы\n3. Перспективы\n4. Риски"
+        system_prompt = (
+            "Ты финансовый аналитик. Проанализируй новости компании. "
+            "Формат ответа:\n1. Настрой\n2. Темы\n3. Перспективы\n4. Риски"
         )
+        user_prompt = f"Новости компании {state['ticker']}:\n{state['news']}"
+
+        msg = call_deepseek(system_prompt, user_prompt)
         return {"semantic": msg}
     except Exception as e:
         logger.error(f"Grade error {state['ticker']}: {e}")
@@ -126,11 +136,13 @@ def moex_news(state: State) -> dict:
 @traceable
 def make_trade_analysis(state: State) -> dict:
     try:
-        msg = llm.invoke(
-            f"Анализ {state['ticker']} за 180 дней: {state['moex_data']}\n"
-            "Оцени:\n2.1 Тренды\n2.2 Импульс\n2.3 Волатильность\n"
-            "Формат:\nИндикатор - значение"
+        system_prompt = (
+            "Ты технический аналитик. Проанализируй данные торгов. "
+            "Формат ответа:\n1. Тренды\n2. Импульс\n3. Волатильность"
         )
+        user_prompt = f"Данные по {state['ticker']} за 180 дней:\n{state['moex_data']}"
+
+        msg = call_deepseek(system_prompt, user_prompt)
         return {"moex_data_analysis": msg}
     except Exception as e:
         logger.error(f"Trade error {state['ticker']}: {e}")
@@ -147,11 +159,13 @@ def ifrs_analysis(state: State) -> dict:
         with open(file_path, 'r', encoding='utf-8') as f:
             ifrs_content = f.read()
 
-        msg = llm.invoke(
-            f"Анализ отчетности МСФО {state['ticker']}:\n{ifrs_content}\n"
-            "Оцени:\n1. Финансовая устойчивость\n2. Рентабельность\n3. Ликвидность\n4. Долговая нагрузка\n"
-            "Формат:\n1. Финансовая устойчивость\n2. Рентабельность\n3. Ликвидность\n4. Долговая нагрузка"
+        system_prompt = (
+            "Ты аналитик финансовой отчетности. Оцени отчетность по МСФО. "
+            "Формат ответа:\n1. Финансовая устойчивость\n2. Рентабельность\n3. Ликвидность\n4. Долговая нагрузка"
         )
+        user_prompt = f"Отчетность {state['ticker']}:\n{ifrs_content}"
+
+        msg = call_deepseek(system_prompt, user_prompt)
         return {"ifrs_data": msg}
     except Exception as e:
         logger.error(f"IFRS error {state['ticker']}: {e}")
@@ -160,33 +174,40 @@ def ifrs_analysis(state: State) -> dict:
 @traceable
 def final_analise(state: State) -> dict:
     try:
-        msg = llm.invoke(
+        system_prompt = (
+            "Ты консервативный управляющий портфелем с горизонтом 5+ лет. "
+            "Дай рекомендацию по позиции. Формат: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ\nПояснение"
+        )
+        user_prompt = (
             f"Анализ {state['ticker']}:\n"
-            f"1. Общий новостной фон: {state['market_news']}\n"
+            f"1. Новостной фон: {state['market_news']}\n"
             f"2. Новости компании: {state['semantic']}\n"
             f"3. Тех. анализ: {state['moex_data_analysis']}\n"
-            f"4. Отчетность МСФО: {state['ifrs_data']}\n"
-            "Консервативный инвестор, 5+ лет, доход выше депозитов.\n"
-            "Формат: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ\nПояснение"
+            f"4. Отчетность: {state['ifrs_data']}\n"
+            "Цель: доход выше депозитов при минимальном риске."
         )
+
+        msg = call_deepseek(system_prompt, user_prompt)
         return {"final_data": msg}
     except Exception as e:
         logger.error(f"Final error {state['ticker']}: {e}")
         return {"final_data": "Ошибка"}
 
 def process_portfolio(portfolio: dict) -> dict:
-    from langgraph.graph import StateGraph, START, END
-
-    portfolio_decisions = {}
+    """Обработка портфеля акций через последовательность анализов"""
     workflow = StateGraph(State)
-    workflow.add_node("generate_market_news", generate_market_news)  # Новый узел
+
+    # Добавляем узлы в граф
+    workflow.add_node("generate_market_news", generate_market_news)
     workflow.add_node("generate_news", generate_news)
     workflow.add_node("grade_news", grade_news)
     workflow.add_node("moex_news", moex_news)
     workflow.add_node("make_trade_analysis", make_trade_analysis)
     workflow.add_node("ifrs_analysis", ifrs_analysis)
     workflow.add_node("final_analise", final_analise)
-    workflow.add_edge(START, "generate_market_news")  # Начинаем с общего фона
+
+    # Определяем последовательность выполнения
+    workflow.add_edge(START, "generate_market_news")
     workflow.add_edge("generate_market_news", "generate_news")
     workflow.add_edge("generate_news", "grade_news")
     workflow.add_edge("grade_news", "moex_news")
@@ -196,6 +217,7 @@ def process_portfolio(portfolio: dict) -> dict:
     workflow.add_edge("final_analise", END)
 
     chain = workflow.compile()
+    portfolio_decisions = {}
 
     for ticker, quantity in portfolio.items():
         initial_state = {
@@ -206,7 +228,7 @@ def process_portfolio(portfolio: dict) -> dict:
             "moex_data": "",
             "moex_data_analysis": "",
             "ifrs_data": "",
-            "market_news": "",  # Добавлено в начальное состояние
+            "market_news": "",
             "final_data": ""
         }
 
@@ -241,7 +263,6 @@ def suggest_rebalancing(decisions: dict) -> dict:
 if __name__ == "__main__":
     portfolio = {
         'MGNT': 13,
-        'UNAC': 36000,
         'TRNFP': 111
     }
 
