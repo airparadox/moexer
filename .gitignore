@@ -32,3 +32,4 @@ MANIFEST
 .gigaide/
 *.swp
 *.swo
+.aider*
