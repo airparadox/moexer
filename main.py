@@ -13,6 +13,7 @@ import feedparser
 from openai import OpenAI
 from langgraph.graph import StateGraph, START, END
 from datetime import timezone
+from io import StringIO
 
 
 logging.basicConfig(level=logging.INFO)
@@ -77,10 +78,10 @@ def generate_market_news(state: State) -> dict:
 
         if news_entries:
             system_prompt = (
-                "Ты опытный аналитик финансовых рынков. Проанализируй новости и оцени их влияние на Московскую биржу. "
-                "Формат ответа:\n1. Общий настрой\n2. Ключевые факторы\n3. Потенциальное влияние"
+                "Аналитик рынка. Кратко оцени влияние новостей на Мосбиржу. "
+                "Формат:\n1. Настрой\n2. Факторы\n3. Влияние"
             )
-            user_prompt = f"Новости за сутки:\n{news_entries}"
+            user_prompt = f"Новости за сутки (первые 5):\n{news_entries[:5]}"
 
             analysis = call_deepseek(system_prompt, user_prompt)
             return {"market_news": analysis}
@@ -104,10 +105,10 @@ def generate_news(state: State) -> dict:
 def grade_news(state: State) -> dict:
     try:
         system_prompt = (
-            "Ты финансовый аналитик. Проанализируй новости компании. "
-            "Формат ответа:\n1. Настрой\n2. Темы\n3. Перспективы\n4. Риски"
+            "Аналитик. Кратко проанализируй новости компании. "
+            "Формат:\n1. Настрой\n2. Ключевое\n3. Риски"
         )
-        user_prompt = f"Новости компании {state['ticker']}:\n{state['news']}"
+        user_prompt = f"Новости {state['ticker']} (первые 3):\n{state['news'][:3]}"
 
         msg = call_deepseek(system_prompt, user_prompt)
         return {"semantic": msg}
@@ -137,10 +138,13 @@ def moex_news(state: State) -> dict:
 def make_trade_analysis(state: State) -> dict:
     try:
         system_prompt = (
-            "Ты технический аналитик. Проанализируй данные торгов. "
-            "Формат ответа:\n1. Тренды\n2. Импульс\n3. Волатильность"
+            "Теханализ. Кратко проанализируй данные. "
+            "Формат:\n1. Тренд\n2. Объемы\n3. Волатильность"
         )
-        user_prompt = f"Данные по {state['ticker']} за 180 дней:\n{state['moex_data']}"
+        # Берем только последние 30 дней для анализа
+        df = pd.read_csv(StringIO(state['moex_data']))
+        last_30_days = df.tail(30).to_string(index=False)
+        user_prompt = f"Данные {state['ticker']} (30 дней):\n{last_30_days}"
 
         msg = call_deepseek(system_prompt, user_prompt)
         return {"moex_data_analysis": msg}
@@ -160,10 +164,11 @@ def ifrs_analysis(state: State) -> dict:
             ifrs_content = f.read()
 
         system_prompt = (
-            "Ты аналитик финансовой отчетности. Оцени отчетность по МСФО. "
-            "Формат ответа:\n1. Финансовая устойчивость\n2. Рентабельность\n3. Ликвидность\n4. Долговая нагрузка"
+            "Аналитик отчетности. Кратко оцени МСФО. "
+            "Формат:\n1. Финансы\n2. Рентабельность\n3. Долги"
         )
-        user_prompt = f"Отчетность {state['ticker']}:\n{ifrs_content}"
+        # Берем только первые 2000 символов отчета
+        user_prompt = f"Отчетность {state['ticker']} (фрагмент):\n{ifrs_content[:2000]}"
 
         msg = call_deepseek(system_prompt, user_prompt)
         return {"ifrs_data": msg}
@@ -175,8 +180,7 @@ def ifrs_analysis(state: State) -> dict:
 def final_analise(state: State) -> dict:
     try:
         system_prompt = (
-            "Ты консервативный управляющий портфелем с горизонтом 5+ лет. "
-            "Дай рекомендацию по позиции. Формат: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ\nПояснение"
+            "Консервативный управляющий. Рекомендация: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ\nКраткое пояснение"
         )
         user_prompt = (
             f"Анализ {state['ticker']}:\n"
