@@ -32,14 +32,22 @@ class PortfolioPosition(BaseModel):
 
 class Portfolio(BaseModel):
     positions: List[PortfolioPosition]
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, int]):
         positions = [PortfolioPosition(ticker=k, quantity=v) for k, v in data.items()]
         return cls(positions=positions)
 
-@dataclass
-class AnalysisResult:
+    def get_tickers(self) -> List[str]:
+        return [pos.ticker for pos in self.positions]
+
+    def get_position(self, ticker: str) -> Optional[PortfolioPosition]:
+        for pos in self.positions:
+            if pos.ticker == ticker:
+                return pos
+        return None
+
+class AnalysisResult(BaseModel):
     """
     Результат анализа тикера.
     
@@ -53,3 +61,9 @@ class AnalysisResult:
     recommendation: str
     confidence: float
     analysis_data: Dict[str, str]
+
+    @validator('confidence')
+    def validate_confidence(cls, v):
+        if not 0.0 <= v <= 1.0:
+            raise ValueError('Confidence must be between 0 and 1')
+        return v
