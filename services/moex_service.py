@@ -69,3 +69,13 @@ class MOEXService:
         except Exception as e:
             logger.error(f"Failed to get recent data for {ticker}: {e}")
             return "Ошибка получения данных"
+
+    @retry_on_failure(max_retries=settings.max_retries)
+    def get_latest_price(self, ticker: str) -> float:
+        """Возвращает последнюю цену закрытия по тикеру."""
+        try:
+            df = self.get_ticker_data(ticker, days_back=5)
+            return float(df['CLOSE'].iloc[-1])
+        except Exception as e:
+            logger.error(f"Failed to get latest price for {ticker}: {e}")
+            raise APIError(f"Failed to get latest price for {ticker}: {e}")
