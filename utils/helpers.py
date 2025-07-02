@@ -3,6 +3,7 @@ import time
 import requests
 from functools import wraps
 from typing import Callable, Any
+from models.state import Portfolio
 import re
 
 logger = logging.getLogger(__name__)
@@ -45,3 +46,14 @@ def truncate_text(text: str, max_length: int) -> str:
     if len(text) <= max_length:
         return text
     return text[:max_length] + "..."
+
+def calculate_portfolio_value(portfolio: 'Portfolio', price_getter: Callable[[str], float]) -> float:
+    """Возвращает стоимость портфеля, используя функцию получения цены."""
+    total = 0.0
+    for position in portfolio.positions:
+        try:
+            price = price_getter(position.ticker)
+            total += price * position.quantity
+        except Exception as e:
+            logger.error(f"Price for {position.ticker} unavailable: {e}")
+    return total

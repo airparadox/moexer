@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from models import Portfolio
 from analyzers import PortfolioAnalyzer, RebalancingAnalyzer, AsyncPortfolioAnalyzer
-from utils import log_performance_summary
+from utils import log_performance_summary, calculate_portfolio_value
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +47,12 @@ def analyze_portfolio_improved(portfolio_dict: dict) -> dict:
         
         # Получаем общую сводку
         portfolio_summary = rebalancing_analyzer.get_portfolio_summary(analysis_results)
+
+        total_value = calculate_portfolio_value(
+            portfolio,
+            portfolio_analyzer.moex_service.get_latest_price,
+        )
+        portfolio_summary["total_value"] = total_value
         
         # Формируем результат
         results = {
@@ -94,6 +100,12 @@ async def analyze_portfolio_async(portfolio_dict: dict) -> dict:
 
         rebalancing_suggestions = rebalancing_analyzer.suggest_rebalancing(analysis_results)
         portfolio_summary = rebalancing_analyzer.get_portfolio_summary(analysis_results)
+
+        total_value = calculate_portfolio_value(
+            portfolio,
+            portfolio_analyzer.moex_service.get_latest_price,
+        )
+        portfolio_summary["total_value"] = total_value
 
         results = {
             "analysis_results": {},
@@ -143,6 +155,8 @@ def print_analysis_results(results: dict):
     print(f"К продаже: {summary['sell_recommendations']}")
     print(f"Средняя уверенность: {summary['average_confidence']:.2f}")
     print(f"Общая стратегия: {summary['portfolio_action']}")
+    if 'total_value' in summary:
+        print(f"Стоимость портфеля: {summary['total_value']:.2f} руб.")
     
     # Выводим детальные результаты по каждому тикеру
     print("\n" + "="*60)
