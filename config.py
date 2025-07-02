@@ -1,7 +1,9 @@
-from pydantic import BaseSettings, validator
-from typing import Optional
+from pydantic_settings import BaseSettings
+from pydantic import validator
+
 
 class Settings(BaseSettings):
+    log_level: str = "INFO"  # Default value
     deepseek_api_key: str
     deepseek_model: str = "deepseek-chat"
     deepseek_base_url: str = "https://api.deepseek.com"
