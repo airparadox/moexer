@@ -1,5 +1,7 @@
 import logging
 import asyncio
+import json
+import argparse
 from dotenv import load_dotenv
 
 from models import Portfolio
@@ -12,6 +14,11 @@ logger = logging.getLogger(__name__)
 
 # Загружаем переменные окружения
 load_dotenv()
+
+def load_portfolio_from_file(file_path: str) -> dict:
+    """Загружает портфель из JSON-файла."""
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 def analyze_portfolio_improved(portfolio_dict: dict) -> dict:
     """
@@ -151,19 +158,25 @@ def print_analysis_results(results: dict):
 
 
 if __name__ == "__main__":
-    # Тестовый портфель
-    portfolio = {
-        'MGNT': 13,
-        'TRNFP': 111,
-        'UNAC': 100,
-        'SBER': 100
-    }
-    
-    print("🚀 Запуск улучшенного анализа портфеля (async)...")
-    print(f"Анализируемый портфель: {portfolio}")
+    parser = argparse.ArgumentParser(description="Portfolio analyzer")
+    parser.add_argument(
+        "-f",
+        "--file",
+        default="portfolio.json",
+        help="Путь к JSON-файлу с портфелем",
+    )
+    args = parser.parse_args()
 
-    # Выполняем анализ с новой архитектурой асинхронно
-    results = asyncio.run(analyze_portfolio_async(portfolio))
+    try:
+        portfolio_data = load_portfolio_from_file(args.file)
+    except Exception as e:
+        logger.error(f"Ошибка чтения портфеля из файла: {e}")
+        raise SystemExit(1)
+
+    print("🚀 Запуск улучшенного анализа портфеля (async)...")
+    print(f"Анализируемый портфель: {portfolio_data}")
+
+    results = asyncio.run(analyze_portfolio_async(portfolio_data))
     
     # Выводим результаты
     print_analysis_results(results)
