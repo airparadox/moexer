@@ -100,7 +100,7 @@ def print_analysis_results(results: dict):
         print(f"\n🏢 {ticker}")
         print(f"   Количество: {data['quantity']}")
         print(f"   Рекомендация: {data['recommendation']} (уверенность: {data['confidence']:.2f})")
-        print(f"   Решение: {data['decision'][:200]}...")
+        print(f"   Решение: {data['decision']}...")
         print(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
 
 
@@ -108,7 +108,9 @@ if __name__ == "__main__":
     # Тестовый портфель
     portfolio = {
         'MGNT': 13,
-        'TRNFP': 111
+        'TRNFP': 111,
+        'UNAC': 100,
+        'SBER': 100
     }
     
     print("🚀 Запуск улучшенного анализа портфеля...")

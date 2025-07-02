@@ -60,7 +60,7 @@ class PortfolioAnalyzer:
                 return {"semantic": "Нет новостей для анализа"}
             
             system_prompt = "Анализ новостей компании. Формат: Настрой, Ключевое, Риски"
-            user_prompt = f"Новости {state['ticker']}:\n{state['news'][:2]}"
+            user_prompt = f"Новости {state['ticker']}:\n{state['news']}"
             
             analysis = self.ai_service.call_deepseek(system_prompt, user_prompt)
             return {"semantic": analysis}
@@ -88,8 +88,8 @@ class PortfolioAnalyzer:
             
             system_prompt = "Теханализ. Формат: Тренд, Объемы, Волатильность"
             
-            # Используем сервис для получения последних 20 дней
-            recent_data = self.moex_service.get_recent_data(state['ticker'], 20)
+            # Используем сервис для получения последних 180 дней
+            recent_data = self.moex_service.get_recent_data(state['ticker'], 180)
             user_prompt = f"Данные {state['ticker']}:\n{recent_data}"
             
             analysis = self.ai_service.call_deepseek(system_prompt, user_prompt)
@@ -125,10 +125,10 @@ class PortfolioAnalyzer:
             system_prompt = "Рекомендация: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ с пояснением"
             
             # Ограничиваем длину каждого блока данных
-            market_news = truncate_text(state['market_news'], 300)
-            semantic = truncate_text(state['semantic'], 300)
-            moex_analysis = truncate_text(state['moex_data_analysis'], 300)
-            ifrs_data = truncate_text(state['ifrs_data'], 300)
+            market_news = truncate_text(state['market_news'], 3000)
+            semantic = truncate_text(state['semantic'], 3000)
+            moex_analysis = truncate_text(state['moex_data_analysis'], 3000)
+            ifrs_data = truncate_text(state['ifrs_data'], 3000)
             
             user_prompt = (
                 f"Сводка по {state['ticker']}:\n"
