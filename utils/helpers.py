@@ -38,7 +38,7 @@ def retry_on_failure(max_retries: int = 3, delay: float = 1.0):
 def has_only_ticker(text: str, ticker: str) -> bool:
     """Проверяет, содержит ли текст только указанный тикер"""
     tickers = re.findall(r'\b[A-Z]{3,4}\b', text)
-    return all(t == ticker for t in tickers) and tickers
+    return bool(tickers) and all(t == ticker for t in tickers)
 
 def truncate_text(text: str, max_length: int) -> str:
     """Обрезает текст до указанной длины"""

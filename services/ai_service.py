@@ -1,6 +1,7 @@
 import logging
 from openai import OpenAI
 from typing import Optional
+import os
 from config import settings
 from utils.helpers import retry_on_failure, APIError
 from utils.monitoring import monitor_performance
@@ -11,11 +12,18 @@ class AIService:
     """Сервис для работы с DeepSeek API"""
     
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or settings.deepseek_api_key
-        self.client = OpenAI(
-            api_key=self.api_key, 
-            base_url=settings.deepseek_base_url
-        )
+        env_key = os.getenv("DEEPSEEK_API_KEY")
+        self.api_key = api_key or env_key
+        if not self.api_key:
+            raise ValueError("DEEPSEEK_API_KEY must be set")
+        self.client: Optional[OpenAI] = None
+
+    def _ensure_client(self):
+        if self.client is None:
+            self.client = OpenAI(
+                api_key=self.api_key,
+                base_url=settings.deepseek_base_url,
+            )
     
     @monitor_performance("ai_service")
     @retry_on_failure(max_retries=settings.max_retries)
@@ -34,6 +42,7 @@ class AIService:
             APIError: При ошибках API
         """
         try:
+            self._ensure_client()
             response = self.client.chat.completions.create(
                 model=settings.deepseek_model,
                 messages=[
@@ -46,4 +55,4 @@ class AIService:
             return response.choices[0].message.content
         except Exception as e:
             logger.error(f"DeepSeek API error: {e}")
-            raise APIError(f"Failed to call DeepSeek API: {e}")
+            return "Ошибка анализа"

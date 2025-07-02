@@ -1,8 +1,9 @@
 import logging
+import asyncio
 from dotenv import load_dotenv
 
 from models import Portfolio
-from analyzers import PortfolioAnalyzer, RebalancingAnalyzer
+from analyzers import PortfolioAnalyzer, RebalancingAnalyzer, AsyncPortfolioAnalyzer
 from utils import log_performance_summary
 
 # Настройка логирования
@@ -73,6 +74,51 @@ def analyze_portfolio_improved(portfolio_dict: dict) -> dict:
             "portfolio_summary": {"error": "Ошибка анализа"}
         }
 
+
+async def analyze_portfolio_async(portfolio_dict: dict) -> dict:
+    """Асинхронный анализ портфеля с параллельной обработкой тикеров."""
+    try:
+        portfolio = Portfolio.from_dict(portfolio_dict)
+        portfolio_analyzer = AsyncPortfolioAnalyzer()
+        rebalancing_analyzer = RebalancingAnalyzer()
+
+        logger.info("Начинаем асинхронный анализ портфеля...")
+        analysis_results = await portfolio_analyzer.analyze_portfolio_async(portfolio)
+
+        rebalancing_suggestions = rebalancing_analyzer.suggest_rebalancing(analysis_results)
+        portfolio_summary = rebalancing_analyzer.get_portfolio_summary(analysis_results)
+
+        results = {
+            "analysis_results": {},
+            "rebalancing_suggestions": rebalancing_suggestions,
+            "portfolio_summary": portfolio_summary,
+        }
+
+        for ticker, result in analysis_results.items():
+            results["analysis_results"][ticker] = {
+                "quantity": next(pos.quantity for pos in portfolio.positions if pos.ticker == ticker),
+                "recommendation": result.recommendation,
+                "confidence": result.confidence,
+                "decision": result.analysis_data.get("final_decision", "Нет данных"),
+                "details": {
+                    "market_news": result.analysis_data.get("market_news", ""),
+                    "company_news": result.analysis_data.get("semantic", ""),
+                    "technical_analysis": result.analysis_data.get("moex_analysis", ""),
+                    "financial_data": result.analysis_data.get("ifrs_data", ""),
+                },
+            }
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Ошибка при асинхронном анализе портфеля: {e}")
+        return {
+            "error": str(e),
+            "analysis_results": {},
+            "rebalancing_suggestions": {},
+            "portfolio_summary": {"error": "Ошибка анализа"},
+        }
+
 def print_analysis_results(results: dict):
     """Выводит результаты анализа в удобном формате"""
     if "error" in results:
@@ -113,11 +159,11 @@ if __name__ == "__main__":
         'SBER': 100
     }
     
-    print("🚀 Запуск улучшенного анализа портфеля...")
+    print("🚀 Запуск улучшенного анализа портфеля (async)...")
     print(f"Анализируемый портфель: {portfolio}")
-    
-    # Выполняем анализ с новой архитектурой
-    results = analyze_portfolio_improved(portfolio)
+
+    # Выполняем анализ с новой архитектурой асинхронно
+    results = asyncio.run(analyze_portfolio_async(portfolio))
     
     # Выводим результаты
     print_analysis_results(results)
