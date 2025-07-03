@@ -6,7 +6,13 @@ from dotenv import load_dotenv
 
 from models import Portfolio
 from analyzers import PortfolioAnalyzer, RebalancingAnalyzer, AsyncPortfolioAnalyzer
-from utils import log_performance_summary, calculate_portfolio_value
+from utils import (
+    log_performance_summary,
+    calculate_portfolio_value,
+    get_performance_report,
+)
+from datetime import datetime
+import os
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -171,6 +177,59 @@ def print_analysis_results(results: dict):
         print(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
 
 
+def generate_analysis_report(results: dict) -> str:
+    """Формирует текстовый отчет по результатам анализа."""
+    if "error" in results:
+        return f"❌ Ошибка: {results['error']}"
+
+    lines = []
+    summary = results["portfolio_summary"]
+    lines.append("=" * 60)
+    lines.append("📊 СВОДКА ПО ПОРТФЕЛЮ")
+    lines.append("=" * 60)
+    lines.append(f"Всего позиций: {summary['total_positions']}")
+    lines.append(f"К покупке: {summary['buy_recommendations']}")
+    lines.append(f"Держать: {summary['hold_recommendations']}")
+    lines.append(f"К продаже: {summary['sell_recommendations']}")
+    lines.append(f"Средняя уверенность: {summary['average_confidence']:.2f}")
+    lines.append(f"Общая стратегия: {summary['portfolio_action']}")
+    if "total_value" in summary:
+        lines.append(f"Стоимость портфеля: {summary['total_value']:.2f} руб.")
+
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("📈 ДЕТАЛЬНЫЙ АНАЛИЗ ПО ТИКЕРАМ")
+    lines.append("=" * 60)
+
+    for ticker, data in results["analysis_results"].items():
+        lines.append(f"\n🏢 {ticker}")
+        lines.append(f"   Количество: {data['quantity']}")
+        lines.append(
+            f"   Рекомендация: {data['recommendation']} (уверенность: {data['confidence']:.2f})"
+        )
+        lines.append(f"   Решение: {data['decision']}...")
+        lines.append(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
+
+    return "\n".join(lines)
+
+
+def save_full_report(results: dict, start_time: datetime) -> str:
+    """Сохраняет полный отчет анализа и метрик в файл."""
+    analysis_report = generate_analysis_report(results)
+    performance_report = get_performance_report()
+    full_report = (
+        analysis_report
+        + "\n\n=== ОТЧЕТ О ПРОИЗВОДИТЕЛЬНОСТИ ===\n"
+        + performance_report
+    )
+
+    os.makedirs("reports", exist_ok=True)
+    file_name = start_time.strftime("report_%Y%m%d_%H%M%S.txt")
+    path = os.path.join("reports", file_name)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(full_report)
+    return path
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Portfolio analyzer")
     parser.add_argument(
@@ -180,6 +239,8 @@ if __name__ == "__main__":
         help="Путь к JSON-файлу с портфелем",
     )
     args = parser.parse_args()
+
+    start_time = datetime.now()
 
     try:
         portfolio_data = load_portfolio_from_file(args.file)
@@ -191,12 +252,15 @@ if __name__ == "__main__":
     print(f"Анализируемый портфель: {portfolio_data}")
 
     results = asyncio.run(analyze_portfolio_async(portfolio_data))
-    
+
     # Выводим результаты
     print_analysis_results(results)
-    
+
     # Выводим сводку производительности
     print("\n" + "="*60)
     print("📊 ОТЧЕТ О ПРОИЗВОДИТЕЛЬНОСТИ")
     print("="*60)
     log_performance_summary()
+
+    report_path = save_full_report(results, start_time)
+    print(f"\n💾 Отчет сохранен в {report_path}")
