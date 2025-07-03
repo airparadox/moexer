@@ -1,5 +1,6 @@
 import logging
-from typing import Dict
+import os
+from typing import Dict, Optional
 from langsmith import traceable
 from langgraph.graph import StateGraph, START, END
 from io import StringIO
@@ -16,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 class PortfolioAnalyzer:
     """Основной класс для анализа портфеля"""
-    
-    def __init__(self):
-        self.ai_service = AIService()
+
+    def __init__(self, api_key: Optional[str] = None):
+        key = api_key or os.getenv("DEEPSEEK_API_KEY", "dummy")
+        self.ai_service = AIService(api_key=key)
         self.news_service = NewsService()
         self.moex_service = MOEXService()
         self.ifrs_service = IFRSService()
