@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Callable
 from langsmith import traceable
-from models.state import AnalysisResult, Portfolio
+from models.state import AnalysisResult, Portfolio, RiskProfile
 from services.moex_service import MOEXService
 
 logger = logging.getLogger(__name__)
@@ -126,13 +126,21 @@ class RebalancingAnalyzer:
             "high_confidence_count": sum(1 for c in confidences if c >= 0.8),
         }
         
-        # Общая рекомендация для портфеля
+        # Общая рекомендация для портфеля с учетом типа инвестирования
         if summary["sell_recommendations"] > summary["total_positions"] // 2:
-            summary["portfolio_action"] = "Рассмотрите снижение рисков"
+            action = "Рассмотрите снижение рисков"
         elif summary["buy_recommendations"] > summary["total_positions"] // 2:
-            summary["portfolio_action"] = "Хорошие возможности для роста"
+            action = "Хорошие возможности для роста"
         else:
-            summary["portfolio_action"] = "Сбалансированный подход"
-        
+            action = "Сбалансированный подход"
+
+        if portfolio.risk_profile == RiskProfile.CONSERVATIVE:
+            action += ". Поддерживайте осторожный подход"
+        elif portfolio.risk_profile == RiskProfile.AGGRESSIVE:
+            action += ". Допустимы более рисковые сделки"
+
+        summary["portfolio_action"] = action
+
         summary["cash_rub"] = portfolio.cash_rub
+        summary["risk_profile"] = portfolio.risk_profile.value
         return summary

@@ -2,6 +2,7 @@ from typing_extensions import TypedDict
 from pydantic import BaseModel, validator
 from typing import Dict, List, Optional
 from dataclasses import dataclass
+from enum import Enum
 
 class State(TypedDict):
     ticker: str
@@ -13,6 +14,7 @@ class State(TypedDict):
     ifrs_data: str
     final_data: str
     market_news: str
+    risk_profile: str
 
 class PortfolioPosition(BaseModel):
     ticker: str
@@ -30,19 +32,35 @@ class PortfolioPosition(BaseModel):
             raise ValueError('Quantity must be non-negative')
         return v
 
+class RiskProfile(str, Enum):
+    CONSERVATIVE = "консервативный"
+    BALANCED = "сбалансированный"
+    AGGRESSIVE = "агрессивный"
+
+
 class Portfolio(BaseModel):
     positions: List[PortfolioPosition]
     cash_rub: float = 0.0
+    risk_profile: RiskProfile = RiskProfile.BALANCED
 
     @classmethod
     def from_dict(cls, data: Dict[str, int]):
         cash = float(data.get("RUB", 0))
+        risk_profile = data.get("risk_profile", RiskProfile.BALANCED)
+        # Приводим строковый профиль к Enum, если необходимо
+        if isinstance(risk_profile, str):
+            try:
+                risk_profile = RiskProfile(risk_profile)
+            except ValueError:
+                raise ValueError(
+                    f"Risk profile must be one of {[p.value for p in RiskProfile]}"
+                )
         positions = [
             PortfolioPosition(ticker=k, quantity=v)
             for k, v in data.items()
-            if k != "RUB"
+            if k not in {"RUB", "risk_profile"}
         ]
-        return cls(positions=positions, cash_rub=cash)
+        return cls(positions=positions, cash_rub=cash, risk_profile=risk_profile)
 
     def get_tickers(self) -> List[str]:
         return [pos.ticker for pos in self.positions]

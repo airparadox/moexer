@@ -6,7 +6,7 @@ from langgraph.graph import StateGraph, START, END
 from io import StringIO
 import pandas as pd
 
-from models.state import State, Portfolio, AnalysisResult
+from models.state import State, Portfolio, AnalysisResult, RiskProfile
 from services.ai_service import AIService
 from services.news_service import NewsService
 from services.moex_service import MOEXService
@@ -131,14 +131,20 @@ class PortfolioAnalyzer:
             semantic = truncate_text(state['semantic'], 3000)
             moex_analysis = truncate_text(state['moex_data_analysis'], 3000)
             ifrs_data = truncate_text(state['ifrs_data'], 3000)
-            
+            risk = state.get('risk_profile', RiskProfile.BALANCED.value)
+            goal_map = {
+                RiskProfile.CONSERVATIVE.value: "Цель: стабильный доход и минимум риска",
+                RiskProfile.BALANCED.value: "Цель: умеренный рост с контролем риска",
+                RiskProfile.AGGRESSIVE.value: "Цель: максимальный рост, готовность к риску",
+            }
+
             user_prompt = (
                 f"Сводка по {state['ticker']}:\n"
                 f"- Рынок: {market_news}\n"
                 f"- Компания: {semantic}\n"
                 f"- График: {moex_analysis}\n"
                 f"- Финансы: {ifrs_data}\n"
-                "Цель: доход > депозитов, минимум риска"
+                f"Тип инвестора: {risk}. {goal_map.get(risk, '')}"
             )
             
             analysis = self.ai_service.call_deepseek(system_prompt, user_prompt)
@@ -196,7 +202,8 @@ class PortfolioAnalyzer:
                 "moex_data_analysis": "",
                 "ifrs_data": "",
                 "market_news": "",
-                "final_data": ""
+                "final_data": "",
+                "risk_profile": portfolio.risk_profile.value
             }
 
             logger.info(f"Processing {position.ticker} with quantity {position.quantity}")
