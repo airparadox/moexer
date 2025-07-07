@@ -63,6 +63,13 @@ class TestPortfolio:
         tickers = [pos.ticker for pos in portfolio.positions]
         assert "SBER" in tickers
         assert "GAZP" in tickers
+
+    def test_from_dict_with_cash(self):
+        """Тест создания портфеля с наличными"""
+        data = {"SBER": 100, "RUB": 1000}
+        portfolio = Portfolio.from_dict(data)
+        assert len(portfolio.positions) == 1
+        assert portfolio.cash_rub == 1000
     
     def test_from_dict_empty(self):
         """Тест создания пустого портфеля"""

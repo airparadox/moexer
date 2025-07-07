@@ -32,11 +32,17 @@ class PortfolioPosition(BaseModel):
 
 class Portfolio(BaseModel):
     positions: List[PortfolioPosition]
+    cash_rub: float = 0.0
 
     @classmethod
     def from_dict(cls, data: Dict[str, int]):
-        positions = [PortfolioPosition(ticker=k, quantity=v) for k, v in data.items()]
-        return cls(positions=positions)
+        cash = float(data.get("RUB", 0))
+        positions = [
+            PortfolioPosition(ticker=k, quantity=v)
+            for k, v in data.items()
+            if k != "RUB"
+        ]
+        return cls(positions=positions, cash_rub=cash)
 
     def get_tickers(self) -> List[str]:
         return [pos.ticker for pos in self.positions]

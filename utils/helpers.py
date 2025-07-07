@@ -56,4 +56,5 @@ def calculate_portfolio_value(portfolio: 'Portfolio', price_getter: Callable[[st
             total += price * position.quantity
         except Exception as e:
             logger.error(f"Price for {position.ticker} unavailable: {e}")
+    total += portfolio.cash_rub
     return total
