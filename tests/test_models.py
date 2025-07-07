@@ -29,17 +29,16 @@ class TestPortfolioPosition:
             PortfolioPosition(ticker="", quantity=100)
         assert "at least 3 characters" in str(exc_info.value)
     
-    def test_invalid_quantity_zero(self):
-        """Тест валидации нулевого количества"""
-        with pytest.raises(ValidationError) as exc_info:
-            PortfolioPosition(ticker="SBER", quantity=0)
-        assert "must be positive" in str(exc_info.value)
+    def test_zero_quantity_allowed(self):
+        """Нулевое количество теперь допустимо"""
+        position = PortfolioPosition(ticker="SBER", quantity=0)
+        assert position.quantity == 0
     
     def test_invalid_quantity_negative(self):
         """Тест валидации отрицательного количества"""
         with pytest.raises(ValidationError) as exc_info:
             PortfolioPosition(ticker="SBER", quantity=-10)
-        assert "must be positive" in str(exc_info.value)
+        assert "non-negative" in str(exc_info.value)
 
 
 class TestPortfolio:

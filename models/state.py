@@ -26,8 +26,8 @@ class PortfolioPosition(BaseModel):
     
     @validator('quantity')
     def validate_quantity(cls, v):
-        if v <= 0:
-            raise ValueError('Quantity must be positive')
+        if v < 0:
+            raise ValueError('Quantity must be non-negative')
         return v
 
 class Portfolio(BaseModel):
