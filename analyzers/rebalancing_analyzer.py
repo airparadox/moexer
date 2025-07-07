@@ -1,25 +1,38 @@
 import logging
-from typing import Dict
+from typing import Dict, Callable
 from langsmith import traceable
-from models.state import AnalysisResult
+from models.state import AnalysisResult, Portfolio
+from services.moex_service import MOEXService
 
 logger = logging.getLogger(__name__)
 
 class RebalancingAnalyzer:
     """Анализатор для предложений по ребалансировке портфеля"""
     
+    BROKER_FEE = 0.0006  # 0.06%
+    TAX_RATE = 0.15  # 15%
+
+    def __init__(self, price_getter: Callable[[str], float] | None = None):
+        self.price_getter = price_getter or MOEXService().get_latest_price
+
     @traceable
-    def suggest_rebalancing(self, analysis_results: Dict[str, AnalysisResult]) -> Dict[str, str]:
+    def suggest_rebalancing(
+        self,
+        analysis_results: Dict[str, AnalysisResult],
+        portfolio: Portfolio,
+    ) -> Dict[str, str]:
         """
         Предлагает стратегию ребалансировки на основе анализа
-        
+
         Args:
             analysis_results: Результаты анализа по каждому тикеру
-            
+            portfolio: Портфель с позициями и наличными в рублях
+
         Returns:
             Словарь с рекомендациями по ребалансировке
         """
-        rebalancing_suggestions = {}
+        rebalancing_suggestions: Dict[str, str] = {}
+        cash = portfolio.cash_rub
         total_positions = len(analysis_results)
         
         if total_positions == 0:
@@ -36,24 +49,42 @@ class RebalancingAnalyzer:
             recommendations_count[result.recommendation] += 1
         
         # Генерируем предложения
+        # Сначала продаем рекомендации "ПРОДАВАТЬ"
         for ticker, result in analysis_results.items():
-            confidence_text = self._get_confidence_text(result.confidence)
-            
-            if result.recommendation == "КУПИТЬ":
-                suggestion = f"Увеличить позицию. {confidence_text}"
-            elif result.recommendation == "ПРОДАВАТЬ":
-                suggestion = f"Уменьшить позицию. {confidence_text}"
-            else:  # ДЕРЖАТЬ
-                suggestion = f"Сохранить текущую позицию. {confidence_text}"
-            
-            # Добавляем контекст о портфеле
-            if recommendations_count["ПРОДАВАТЬ"] > total_positions // 2:
-                suggestion += " Рассмотрите общее снижение рисков портфеля."
-            elif recommendations_count["КУПИТЬ"] > total_positions // 2:
-                suggestion += " Хорошие возможности для роста портфеля."
-            
-            rebalancing_suggestions[ticker] = suggestion
-        
+            if result.recommendation != "ПРОДАВАТЬ":
+                continue
+            position = portfolio.get_position(ticker)
+            if not position:
+                rebalancing_suggestions[ticker] = "Позиция отсутствует"
+                continue
+            qty = position.quantity
+            price = self.price_getter(ticker)
+            proceeds = price * qty * (1 - self.BROKER_FEE)
+            proceeds_after_tax = proceeds * (1 - self.TAX_RATE)
+            cash += proceeds_after_tax
+            rebalancing_suggestions[ticker] = f"Продать {qty}"
+
+        # Затем покупаем согласно рекомендациям "КУПИТЬ"
+        buy_tickers = [t for t, r in analysis_results.items() if r.recommendation == "КУПИТЬ"]
+        buy_count = len(buy_tickers)
+        for ticker in buy_tickers:
+            price = self.price_getter(ticker)
+            cash_per_ticker = cash / buy_count if buy_count else 0
+            qty = int(cash_per_ticker / (price * (1 + self.BROKER_FEE)))
+            if qty > 0:
+                cost = qty * price * (1 + self.BROKER_FEE)
+                cash -= cost
+                rebalancing_suggestions[ticker] = f"Купить {qty}"
+            else:
+                rebalancing_suggestions[ticker] = "Недостаточно средств"
+
+        # Для остальных "ДЕРЖАТЬ"
+        for ticker, result in analysis_results.items():
+            if ticker not in rebalancing_suggestions:
+                rebalancing_suggestions[ticker] = "Держать"
+
+        rebalancing_suggestions["RUB"] = f"Остаток {int(round(cash))}"
+
         return rebalancing_suggestions
     
     def _get_confidence_text(self, confidence: float) -> str:
@@ -67,12 +98,15 @@ class RebalancingAnalyzer:
         else:
             return "Данные неполные"
     
-    def get_portfolio_summary(self, analysis_results: Dict[str, AnalysisResult]) -> Dict[str, any]:
+    def get_portfolio_summary(
+        self, analysis_results: Dict[str, AnalysisResult], portfolio: Portfolio
+    ) -> Dict[str, any]:
         """
         Создает общую сводку по портфелю
         
         Args:
             analysis_results: Результаты анализа
+            portfolio: Портфель пользователя
             
         Returns:
             Словарь с общей статистикой портфеля
@@ -100,4 +134,5 @@ class RebalancingAnalyzer:
         else:
             summary["portfolio_action"] = "Сбалансированный подход"
         
+        summary["cash_rub"] = portfolio.cash_rub
         return summary

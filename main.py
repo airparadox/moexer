@@ -49,10 +49,10 @@ def analyze_portfolio_improved(portfolio_dict: dict) -> dict:
         analysis_results = portfolio_analyzer.analyze_portfolio(portfolio)
         
         # Получаем рекомендации по ребалансировке
-        rebalancing_suggestions = rebalancing_analyzer.suggest_rebalancing(analysis_results)
+        rebalancing_suggestions = rebalancing_analyzer.suggest_rebalancing(analysis_results, portfolio)
         
         # Получаем общую сводку
-        portfolio_summary = rebalancing_analyzer.get_portfolio_summary(analysis_results)
+        portfolio_summary = rebalancing_analyzer.get_portfolio_summary(analysis_results, portfolio)
 
         total_value = calculate_portfolio_value(
             portfolio,
@@ -104,8 +104,8 @@ async def analyze_portfolio_async(portfolio_dict: dict) -> dict:
         logger.info("Начинаем асинхронный анализ портфеля...")
         analysis_results = await portfolio_analyzer.analyze_portfolio_async(portfolio)
 
-        rebalancing_suggestions = rebalancing_analyzer.suggest_rebalancing(analysis_results)
-        portfolio_summary = rebalancing_analyzer.get_portfolio_summary(analysis_results)
+        rebalancing_suggestions = rebalancing_analyzer.suggest_rebalancing(analysis_results, portfolio)
+        portfolio_summary = rebalancing_analyzer.get_portfolio_summary(analysis_results, portfolio)
 
         total_value = calculate_portfolio_value(
             portfolio,
@@ -163,6 +163,8 @@ def print_analysis_results(results: dict):
     print(f"Общая стратегия: {summary['portfolio_action']}")
     if 'total_value' in summary:
         print(f"Стоимость портфеля: {summary['total_value']:.2f} руб.")
+    if 'cash_rub' in summary:
+        print(f"Свободные средства: {summary['cash_rub']:.2f} руб.")
     
     # Выводим детальные результаты по каждому тикеру
     print("\n" + "="*60)
@@ -195,6 +197,8 @@ def generate_analysis_report(results: dict) -> str:
     lines.append(f"Общая стратегия: {summary['portfolio_action']}")
     if "total_value" in summary:
         lines.append(f"Стоимость портфеля: {summary['total_value']:.2f} руб.")
+    if "cash_rub" in summary:
+        lines.append(f"Свободные средства: {summary['cash_rub']:.2f} руб.")
 
     lines.append("")
     lines.append("=" * 60)
