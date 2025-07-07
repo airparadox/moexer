@@ -8,7 +8,7 @@ from models import Portfolio, PortfolioPosition, AnalysisResult
 async def test_analyze_portfolio_async(monkeypatch):
     analyzer = AsyncPortfolioAnalyzer(max_concurrent_tasks=2)
 
-    async def fake_analyze_single(chain, position):
+    async def fake_analyze_single(chain, position, risk_profile):
         await asyncio.sleep(0.01)
         return position.ticker, AnalysisResult(
             ticker=position.ticker,

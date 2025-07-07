@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from models.state import Portfolio, PortfolioPosition, AnalysisResult
+from models.state import Portfolio, PortfolioPosition, AnalysisResult, RiskProfile
 
 
 class TestPortfolioPosition:
@@ -62,6 +62,15 @@ class TestPortfolio:
         tickers = [pos.ticker for pos in portfolio.positions]
         assert "SBER" in tickers
         assert "GAZP" in tickers
+
+    def test_risk_profile_default(self):
+        portfolio = Portfolio.from_dict({"SBER": 1})
+        assert portfolio.risk_profile == RiskProfile.BALANCED
+
+    def test_risk_profile_custom(self):
+        data = {"SBER": 1, "risk_profile": "агрессивный"}
+        portfolio = Portfolio.from_dict(data)
+        assert portfolio.risk_profile == RiskProfile.AGGRESSIVE
 
     def test_from_dict_with_cash(self):
         """Тест создания портфеля с наличными"""

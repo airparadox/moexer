@@ -5,7 +5,13 @@ from typing import Dict, Tuple
 from langgraph.graph import StateGraph, START, END
 from langsmith import traceable
 
-from models.state import State, PortfolioPosition, Portfolio, AnalysisResult
+from models.state import (
+    State,
+    PortfolioPosition,
+    Portfolio,
+    AnalysisResult,
+    RiskProfile,
+)
 from .portfolio_analyzer import PortfolioAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -17,7 +23,9 @@ class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
         super().__init__()
         self.semaphore = asyncio.Semaphore(max_concurrent_tasks)
 
-    async def _analyze_single(self, chain, position: PortfolioPosition) -> Tuple[str, AnalysisResult]:
+    async def _analyze_single(
+        self, chain, position: PortfolioPosition, risk_profile: RiskProfile
+    ) -> Tuple[str, AnalysisResult]:
         """Анализирует один тикер асинхронно."""
         async with self.semaphore:
             initial_state = {
@@ -30,6 +38,7 @@ class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
                 "ifrs_data": "",
                 "market_news": "",
                 "final_data": "",
+                "risk_profile": risk_profile.value,
             }
             logger.info(f"Async processing {position.ticker} with quantity {position.quantity}")
             result = await asyncio.to_thread(chain.invoke, initial_state)
@@ -76,6 +85,9 @@ class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
 
         chain = workflow.compile()
 
-        tasks = [self._analyze_single(chain, position) for position in portfolio.positions]
+        tasks = [
+            self._analyze_single(chain, position, portfolio.risk_profile)
+            for position in portfolio.positions
+        ]
         results = await asyncio.gather(*tasks)
         return {ticker: res for ticker, res in results}

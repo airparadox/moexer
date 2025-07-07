@@ -4,7 +4,7 @@ import json
 import argparse
 from dotenv import load_dotenv
 
-from models import Portfolio
+from models import Portfolio, RiskProfile
 from analyzers import PortfolioAnalyzer, RebalancingAnalyzer, AsyncPortfolioAnalyzer
 from utils import (
     log_performance_summary,
@@ -161,6 +161,8 @@ def print_analysis_results(results: dict):
     print(f"К продаже: {summary['sell_recommendations']}")
     print(f"Средняя уверенность: {summary['average_confidence']:.2f}")
     print(f"Общая стратегия: {summary['portfolio_action']}")
+    if 'risk_profile' in summary:
+        print(f"Тип инвестора: {summary['risk_profile']}")
     if 'total_value' in summary:
         print(f"Стоимость портфеля: {summary['total_value']:.2f} руб.")
     if 'cash_rub' in summary:
@@ -195,6 +197,8 @@ def generate_analysis_report(results: dict) -> str:
     lines.append(f"К продаже: {summary['sell_recommendations']}")
     lines.append(f"Средняя уверенность: {summary['average_confidence']:.2f}")
     lines.append(f"Общая стратегия: {summary['portfolio_action']}")
+    if "risk_profile" in summary:
+        lines.append(f"Тип инвестора: {summary['risk_profile']}")
     if "total_value" in summary:
         lines.append(f"Стоимость портфеля: {summary['total_value']:.2f} руб.")
     if "cash_rub" in summary:
@@ -242,12 +246,20 @@ if __name__ == "__main__":
         default="portfolio.json",
         help="Путь к JSON-файлу с портфелем",
     )
+    parser.add_argument(
+        "-r",
+        "--risk-profile",
+        default=RiskProfile.BALANCED.value,
+        choices=[p.value for p in RiskProfile],
+        help="Тип инвестирования",
+    )
     args = parser.parse_args()
 
     start_time = datetime.now()
 
     try:
         portfolio_data = load_portfolio_from_file(args.file)
+        portfolio_data["risk_profile"] = args.risk_profile
     except Exception as e:
         logger.error(f"Ошибка чтения портфеля из файла: {e}")
         raise SystemExit(1)
