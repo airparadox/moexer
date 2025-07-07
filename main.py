@@ -180,6 +180,13 @@ def print_analysis_results(results: dict):
         print(f"   Решение: {data['decision']}...")
         print(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
 
+    # Итоговая таблица действий
+    print("\n" + "="*60)
+    print("📋 ИТОГОВАЯ ТАБЛИЦА ДЕЙСТВИЙ")
+    print("="*60)
+    for ticker, action in results["rebalancing_suggestions"].items():
+        print(f"{ticker:<6} {action}")
+
 
 def generate_analysis_report(results: dict) -> str:
     """Формирует текстовый отчет по результатам анализа."""
@@ -217,6 +224,13 @@ def generate_analysis_report(results: dict) -> str:
         )
         lines.append(f"   Решение: {data['decision']}...")
         lines.append(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
+
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("📋 ИТОГОВАЯ ТАБЛИЦА ДЕЙСТВИЙ")
+    lines.append("=" * 60)
+    for ticker, action in results["rebalancing_suggestions"].items():
+        lines.append(f"{ticker:<6} {action}")
 
     return "\n".join(lines)
 
