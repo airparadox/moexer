@@ -11,7 +11,12 @@ from services.ai_service import AIService
 from services.news_service import NewsService
 from services.moex_service import MOEXService
 from services.ifrs_service import IFRSService
-from utils.helpers import APIError, DataProcessingError, truncate_text
+from utils.helpers import (
+    APIError,
+    DataProcessingError,
+    truncate_text,
+    extract_recommendation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +129,15 @@ class PortfolioAnalyzer:
     def final_analysis(self, state: State) -> dict:
         """Финальный анализ и рекомендация"""
         try:
-            system_prompt = "Рекомендация: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ с пояснением"
+            if state["quantity"] == 0:
+                system_prompt = (
+                    "Рекомендация к покупке: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ с пояснением. "
+                    "ДЕРЖАТЬ означает воздержаться от покупки."
+                )
+            else:
+                system_prompt = (
+                    "Рекомендация по текущей позиции: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ с пояснением"
+                )
             
             # Ограничиваем длину каждого блока данных
             market_news = truncate_text(state['market_news'], 3000)
@@ -211,12 +224,8 @@ class PortfolioAnalyzer:
             try:
                 result = chain.invoke(initial_state)
                 
-                # Извлекаем рекомендацию из финального анализа
-                recommendation = "ДЕРЖАТЬ"  # по умолчанию
-                if "КУПИТЬ" in result["final_data"]:
-                    recommendation = "КУПИТЬ"
-                elif "ПРОДАВАТЬ" in result["final_data"]:
-                    recommendation = "ПРОДАВАТЬ"
+                # Извлекаем рекомендацию из финального анализа более надёжным способом
+                recommendation = extract_recommendation(result["final_data"])
                 
                 analysis_result = AnalysisResult(
                     ticker=position.ticker,
