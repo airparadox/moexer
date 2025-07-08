@@ -21,3 +21,18 @@ def test_suggest_rebalancing_with_cash():
     assert result["AAA"].startswith("Продать")
     assert result["BBB"].startswith("Купить")
     assert result["RUB"].startswith("Остаток")
+
+
+def test_rebalancing_zero_quantity_sell():
+    """Продажа невозможна при нулевой позиции."""
+    portfolio = Portfolio.from_dict({"AAA": 0, "RUB": 1000})
+    analysis_results = {
+        "AAA": AnalysisResult(
+            ticker="AAA", recommendation="ПРОДАВАТЬ", confidence=1.0, analysis_data={}
+        ),
+    }
+
+    analyzer = RebalancingAnalyzer(price_getter=lambda t: 100.0)
+    result = analyzer.suggest_rebalancing(analysis_results, portfolio)
+
+    assert result["AAA"] == "Позиция отсутствует"
