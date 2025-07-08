@@ -176,7 +176,6 @@ def print_analysis_results(results: dict):
     for ticker, data in results["analysis_results"].items():
         print(f"\n🏢 {ticker}")
         print(f"   Количество: {data['quantity']}")
-        print(f"   Рекомендация: {data['recommendation']} (уверенность: {data['confidence']:.2f})")
         print(f"   Решение: {data['decision']}...")
         print(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
 
@@ -219,9 +218,6 @@ def generate_analysis_report(results: dict) -> str:
     for ticker, data in results["analysis_results"].items():
         lines.append(f"\n🏢 {ticker}")
         lines.append(f"   Количество: {data['quantity']}")
-        lines.append(
-            f"   Рекомендация: {data['recommendation']} (уверенность: {data['confidence']:.2f})"
-        )
         lines.append(f"   Решение: {data['decision']}...")
         lines.append(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
 

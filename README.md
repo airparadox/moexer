@@ -30,7 +30,6 @@ python main.py --file portfolio.json
 {ticker}:
 Текущий объем: {quantity}
 Решение: {решение}
-Рекомендация: {рекомендация}
 Стоимость портфеля: {value} руб.
 
 
