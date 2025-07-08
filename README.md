@@ -22,7 +22,10 @@
 проанализирована как кандидат для покупки.
 
 ### Запустите скрипт:
-python main.py --file portfolio.json
+python main.py --file portfolio.json --risk-profile тип_портфеля
+
+тип_портфеля может быть сбалансированным, консервативным, агрессивным  
+
 
 ### Результаты будут выведены в консоль в формате:
 
@@ -54,6 +57,7 @@ pip install -r requirements.txt
 Создайте файл `.env` и укажите обязательный ключ API:
 ```env
 DEEPSEEK_API_KEY=your_actual_key
+DEEPSEEK_MODEL=deepseek-reasoner или deepseek-chat 
 ```
 Дополнительные переменные могут быть заданы по желанию. Неизвестные
 переменные будут просто игнорироваться при загрузке настроек.
