@@ -58,3 +58,14 @@ def calculate_portfolio_value(portfolio: 'Portfolio', price_getter: Callable[[st
             logger.error(f"Price for {position.ticker} unavailable: {e}")
     total += portfolio.cash_rub
     return total
+
+def extract_recommendation(text: str) -> str:
+    """Извлекает финальную рекомендацию из текста анализа."""
+    match = re.search(r"Рекомендация[:\uFF1A]?\s*\**(КУПИТЬ|ДЕРЖАТЬ|ПРОДАВАТЬ)", text, re.IGNORECASE)
+    if match:
+        return match.group(1).upper()
+    if "ПРОДАВАТЬ" in text:
+        return "ПРОДАВАТЬ"
+    if "КУПИТЬ" in text:
+        return "КУПИТЬ"
+    return "ДЕРЖАТЬ"

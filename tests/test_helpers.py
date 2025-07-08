@@ -1,7 +1,14 @@
 import pytest
 from unittest.mock import patch, Mock
 import requests
-from utils.helpers import retry_on_failure, has_only_ticker, truncate_text, APIError, DataProcessingError
+from utils.helpers import (
+    retry_on_failure,
+    has_only_ticker,
+    truncate_text,
+    extract_recommendation,
+    APIError,
+    DataProcessingError,
+)
 
 
 class TestRetryDecorator:
@@ -143,6 +150,16 @@ class TestTextHelpers:
         text = "Любой текст"
         result = truncate_text(text, 0)
         assert result == "..."
+
+    def test_extract_recommendation_explicit(self):
+        """Извлекается явная рекомендация"""
+        text = "Решение: \nРекомендация: **ПРОДАВАТЬ**. Стоит избегать."
+        assert extract_recommendation(text) == "ПРОДАВАТЬ"
+
+    def test_extract_recommendation_fallback(self):
+        """Фолбек работает при отсутствии ключевой строки"""
+        text = "Компания хороша, можно КУПИТЬ при снижении."
+        assert extract_recommendation(text) == "КУПИТЬ"
 
 
 class TestCustomExceptions:

@@ -13,6 +13,7 @@ from models.state import (
     RiskProfile,
 )
 from .portfolio_analyzer import PortfolioAnalyzer
+from utils.helpers import extract_recommendation
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +44,7 @@ class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
             logger.info(f"Async processing {position.ticker} with quantity {position.quantity}")
             result = await asyncio.to_thread(chain.invoke, initial_state)
 
-            recommendation = "ДЕРЖАТЬ"
-            if "КУПИТЬ" in result["final_data"]:
-                recommendation = "КУПИТЬ"
-            elif "ПРОДАВАТЬ" in result["final_data"]:
-                recommendation = "ПРОДАВАТЬ"
+            recommendation = extract_recommendation(result["final_data"])
 
             analysis_result = AnalysisResult(
                 ticker=position.ticker,
