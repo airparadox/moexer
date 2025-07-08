@@ -22,8 +22,8 @@ class PortfolioPosition(BaseModel):
     
     @validator('ticker')
     def validate_ticker(cls, v):
-        if not v or len(v) < 3:
-            raise ValueError('Ticker must be at least 3 characters')
+        if not v or len(v) < 2:
+            raise ValueError('Ticker must be at least 2 characters')
         return v.upper()
     
     @validator('quantity')

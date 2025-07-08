@@ -20,14 +20,14 @@ class TestPortfolioPosition:
     def test_invalid_ticker_too_short(self):
         """Тест валидации слишком короткого тикера"""
         with pytest.raises(ValidationError) as exc_info:
-            PortfolioPosition(ticker="AB", quantity=100)
-        assert "at least 3 characters" in str(exc_info.value)
+            PortfolioPosition(ticker="A", quantity=100)
+        assert "at least 2 characters" in str(exc_info.value)
     
     def test_invalid_ticker_empty(self):
         """Тест валидации пустого тикера"""
         with pytest.raises(ValidationError) as exc_info:
             PortfolioPosition(ticker="", quantity=100)
-        assert "at least 3 characters" in str(exc_info.value)
+        assert "at least 2 characters" in str(exc_info.value)
     
     def test_zero_quantity_allowed(self):
         """Нулевое количество теперь допустимо"""
