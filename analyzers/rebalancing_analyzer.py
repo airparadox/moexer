@@ -58,7 +58,13 @@ class RebalancingAnalyzer:
                 rebalancing_suggestions[ticker] = "Позиция отсутствует"
                 continue
             qty = position.quantity
-            price = self.price_getter(ticker)
+            try:
+                price = self.price_getter(ticker)
+            except Exception as e:
+                logger.error(f"Failed to get price for {ticker}: {e}")
+                rebalancing_suggestions[ticker] = "Цена недоступна"
+                continue
+
             proceeds = price * qty * (1 - self.BROKER_FEE)
             proceeds_after_tax = proceeds * (1 - self.TAX_RATE)
             cash += proceeds_after_tax
@@ -68,7 +74,13 @@ class RebalancingAnalyzer:
         buy_tickers = [t for t, r in analysis_results.items() if r.recommendation == "КУПИТЬ"]
         buy_count = len(buy_tickers)
         for ticker in buy_tickers:
-            price = self.price_getter(ticker)
+            try:
+                price = self.price_getter(ticker)
+            except Exception as e:
+                logger.error(f"Failed to get price for {ticker}: {e}")
+                rebalancing_suggestions[ticker] = "Цена недоступна"
+                continue
+
             cash_per_ticker = cash / buy_count if buy_count else 0
             qty = int(cash_per_ticker / (price * (1 + self.BROKER_FEE)))
             if qty > 0:

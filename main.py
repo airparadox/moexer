@@ -281,8 +281,17 @@ if __name__ == "__main__":
     print("🚀 Запуск улучшенного анализа портфеля (async)...")
     print(f"Анализируемый портфель: {portfolio_data}")
 
-    results = asyncio.run(analyze_portfolio_async(portfolio_data))
-
+    try:
+        results = asyncio.run(analyze_portfolio_async(portfolio_data))
+    except Exception as e:
+        logger.error(f"Critical error during analysis: {e}")
+        results = {
+            "error": str(e),
+            "analysis_results": {},
+            "rebalancing_suggestions": {},
+            "portfolio_summary": {"error": "Ошибка анализа"},
+        }
+    
     # Выводим результаты
     print_analysis_results(results)
 
