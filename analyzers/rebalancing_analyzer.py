@@ -54,7 +54,7 @@ class RebalancingAnalyzer:
             if result.recommendation != "ПРОДАВАТЬ":
                 continue
             position = portfolio.get_position(ticker)
-            if not position:
+            if not position or position.quantity <= 0:
                 rebalancing_suggestions[ticker] = "Позиция отсутствует"
                 continue
             qty = position.quantity
