@@ -149,6 +149,7 @@ class PortfolioAnalyzer:
                 RiskProfile.CONSERVATIVE.value: "Цель: стабильный доход и минимум риска",
                 RiskProfile.BALANCED.value: "Цель: умеренный рост с контролем риска",
                 RiskProfile.AGGRESSIVE.value: "Цель: максимальный рост, готовность к риску",
+                RiskProfile.SPECULATIVE.value: "Цель: активные спекуляции и частая ребалансировка",
             }
 
             user_prompt = (

@@ -150,6 +150,8 @@ class RebalancingAnalyzer:
             action += ". Поддерживайте осторожный подход"
         elif portfolio.risk_profile == RiskProfile.AGGRESSIVE:
             action += ". Допустимы более рисковые сделки"
+        elif portfolio.risk_profile == RiskProfile.SPECULATIVE:
+            action += ". Ребалансируйте портфель ежедневно или еженедельно"
 
         summary["portfolio_action"] = action
 

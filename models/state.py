@@ -36,6 +36,7 @@ class RiskProfile(str, Enum):
     CONSERVATIVE = "консервативный"
     BALANCED = "сбалансированный"
     AGGRESSIVE = "агрессивный"
+    SPECULATIVE = "спекулятивный"
 
 
 class Portfolio(BaseModel):
