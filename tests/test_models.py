@@ -72,6 +72,11 @@ class TestPortfolio:
         portfolio = Portfolio.from_dict(data)
         assert portfolio.risk_profile == RiskProfile.AGGRESSIVE
 
+    def test_risk_profile_speculative(self):
+        data = {"SBER": 1, "risk_profile": "спекулятивный"}
+        portfolio = Portfolio.from_dict(data)
+        assert portfolio.risk_profile == RiskProfile.SPECULATIVE
+
     def test_from_dict_with_cash(self):
         """Тест создания портфеля с наличными"""
         data = {"SBER": 100, "RUB": 1000}
