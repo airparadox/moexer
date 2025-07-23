@@ -6,7 +6,13 @@ from .helpers import (
     truncate_text,
     calculate_portfolio_value,
 )
-from .monitoring import monitor_performance, get_performance_report, log_performance_summary, performance_monitor
+from .monitoring import (
+    monitor_performance,
+    get_performance_report,
+    log_performance_summary,
+    performance_monitor,
+)
+from .pmpt import downside_risk, sortino_ratio, omega_ratio
 
 __all__ = [
     'APIError',
@@ -19,4 +25,7 @@ __all__ = [
     'get_performance_report',
     'log_performance_summary',
     'performance_monitor',
+    'downside_risk',
+    'sortino_ratio',
+    'omega_ratio',
 ]
