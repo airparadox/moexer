@@ -78,7 +78,8 @@ def analyze_portfolio_improved(portfolio_dict: dict) -> dict:
                     "market_news": result.analysis_data.get("market_news", ""),
                     "company_news": result.analysis_data.get("semantic", ""),
                     "technical_analysis": result.analysis_data.get("moex_analysis", ""),
-                    "financial_data": result.analysis_data.get("ifrs_data", "")
+                    "financial_data": result.analysis_data.get("ifrs_data", ""),
+                    "pmpt": result.analysis_data.get("pmpt", {}),
                 }
             }
         
@@ -130,6 +131,7 @@ async def analyze_portfolio_async(portfolio_dict: dict) -> dict:
                     "company_news": result.analysis_data.get("semantic", ""),
                     "technical_analysis": result.analysis_data.get("moex_analysis", ""),
                     "financial_data": result.analysis_data.get("ifrs_data", ""),
+                    "pmpt": result.analysis_data.get("pmpt", {}),
                 },
             }
 
@@ -178,6 +180,17 @@ def print_analysis_results(results: dict):
         print(f"   Количество: {data['quantity']}")
         print(f"   Решение: {data['decision']}...")
         print(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
+        pmpt = data['details'].get('pmpt', {})
+        if pmpt:
+            print(
+                f"   Downside risk: {pmpt.get('downside_risk', float('nan')):.4f}"
+            )
+            print(
+                f"   Sortino ratio: {pmpt.get('sortino_ratio', float('nan')):.4f}"
+            )
+            print(
+                f"   Omega ratio: {pmpt.get('omega_ratio', float('nan')):.4f}"
+            )
 
     # Итоговая таблица действий
     print("\n" + "="*60)
@@ -220,6 +233,11 @@ def generate_analysis_report(results: dict) -> str:
         lines.append(f"   Количество: {data['quantity']}")
         lines.append(f"   Решение: {data['decision']}...")
         lines.append(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
+        pmpt = data['details'].get('pmpt', {})
+        if pmpt:
+            lines.append(f"   Downside risk: {pmpt.get('downside_risk', float('nan')):.4f}")
+            lines.append(f"   Sortino ratio: {pmpt.get('sortino_ratio', float('nan')):.4f}")
+            lines.append(f"   Omega ratio: {pmpt.get('omega_ratio', float('nan')):.4f}")
 
     lines.append("")
     lines.append("=" * 60)
