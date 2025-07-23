@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from utils.pmpt import downside_risk, sortino_ratio, omega_ratio
+from utils.pmpt import downside_risk, sortino_ratio, omega_ratio, pmpt_metrics
 
 
 def test_downside_risk():
@@ -22,3 +22,10 @@ def test_omega_ratio():
     gains = 0.1 + 0.04
     losses = 0.02 + 0.01
     assert omega_ratio(returns) == pytest.approx(gains / losses)
+
+
+def test_pmpt_metrics():
+    returns = [0.05, 0.0, -0.05, 0.07]
+    metrics = pmpt_metrics(returns)
+    assert set(metrics.keys()) == {"downside_risk", "sortino_ratio", "omega_ratio"}
+    assert metrics["sortino_ratio"] == pytest.approx(sortino_ratio(returns))

@@ -79,3 +79,13 @@ class MOEXService:
         except Exception as e:
             logger.error(f"Failed to get latest price for {ticker}: {e}")
             raise APIError(f"Failed to get latest price for {ticker}: {e}")
+
+    def get_returns(self, ticker: str, days_back: Optional[int] = None) -> list[float]:
+        """Возвращает ряд доходностей по закрытиям."""
+        try:
+            df = self.get_ticker_data(ticker, days_back=days_back)
+            returns = df['CLOSE'].pct_change().dropna().tolist()
+            return [float(r) for r in returns]
+        except Exception as e:
+            logger.error(f"Failed to get returns for {ticker}: {e}")
+            raise APIError(f"Failed to get returns for {ticker}: {e}")

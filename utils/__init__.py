@@ -12,7 +12,7 @@ from .monitoring import (
     log_performance_summary,
     performance_monitor,
 )
-from .pmpt import downside_risk, sortino_ratio, omega_ratio
+from .pmpt import downside_risk, sortino_ratio, omega_ratio, pmpt_metrics
 
 __all__ = [
     'APIError',
@@ -28,4 +28,5 @@ __all__ = [
     'downside_risk',
     'sortino_ratio',
     'omega_ratio',
+    'pmpt_metrics',
 ]

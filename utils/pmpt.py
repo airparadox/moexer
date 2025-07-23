@@ -57,3 +57,25 @@ def omega_ratio(returns: Iterable[float], target: float = 0.0) -> float:
     if losses == 0:
         return np.inf
     return float(gains / losses)
+
+
+def pmpt_metrics(returns: Iterable[float]) -> dict:
+    """Return basic PMPT metrics for a series of returns.
+
+    Parameters
+    ----------
+    returns : Iterable[float]
+        Periodic returns, usually daily.
+
+    Returns
+    -------
+    dict
+        Dictionary with ``downside_risk``, ``sortino_ratio`` and ``omega_ratio``.
+    """
+
+    arr = list(returns)
+    return {
+        "downside_risk": downside_risk(arr),
+        "sortino_ratio": sortino_ratio(arr),
+        "omega_ratio": omega_ratio(arr),
+    }

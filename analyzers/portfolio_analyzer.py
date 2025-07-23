@@ -17,6 +17,7 @@ from utils.helpers import (
     truncate_text,
     extract_recommendation,
 )
+from utils.pmpt import pmpt_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +241,13 @@ class PortfolioAnalyzer:
                         "final_decision": result["final_data"]
                     }
                 )
+
+                try:
+                    returns = self.moex_service.get_returns(position.ticker)
+                    analysis_result.analysis_data["pmpt"] = pmpt_metrics(returns)
+                except Exception as e:
+                    logger.error(f"Failed to compute PMPT for {position.ticker}: {e}")
+                    analysis_result.analysis_data["pmpt"] = {}
                 
                 portfolio_results[position.ticker] = analysis_result
                 
