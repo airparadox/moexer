@@ -1,6 +1,6 @@
 from typing_extensions import TypedDict
 from pydantic import BaseModel, validator
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -85,7 +85,7 @@ class AnalysisResult(BaseModel):
     ticker: str
     recommendation: str
     confidence: float
-    analysis_data: Dict[str, str]
+    analysis_data: Dict[str, Any]
 
     @validator('confidence')
     def validate_confidence(cls, v):

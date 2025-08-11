@@ -152,3 +152,14 @@ class TestAnalysisResult:
                 ticker="SBER", recommendation="КУПИТЬ", 
                 confidence=1.1, analysis_data={}
             )
+
+    def test_analysis_data_allows_nested_dict(self):
+        """Проверяем, что analysis_data поддерживает вложенные структуры"""
+        nested_data = {"agent_votes": {"agent1": "BUY"}, "pmpt": {"sortino": 1.2}}
+        result = AnalysisResult(
+            ticker="GAZP",
+            recommendation="ДЕРЖАТЬ",
+            confidence=0.5,
+            analysis_data=nested_data,
+        )
+        assert result.analysis_data == nested_data
