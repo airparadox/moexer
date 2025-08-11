@@ -180,6 +180,11 @@ def print_analysis_results(results: dict):
         print(f"   Количество: {data['quantity']}")
         print(f"   Решение: {data['decision']}...")
         print(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
+        votes = data['details'].get('agent_votes', {})
+        if votes:
+            print("   Голоса агентов:")
+            for agent, vote in votes.items():
+                print(f"      {agent}: {vote}")
         pmpt = data['details'].get('pmpt', {})
         if pmpt:
             print(
