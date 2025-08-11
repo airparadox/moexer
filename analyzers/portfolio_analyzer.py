@@ -161,9 +161,26 @@ class PortfolioAnalyzer:
                 f"- Финансы: {ifrs_data}\n"
                 f"Тип инвестора: {risk}. {goal_map.get(risk, '')}"
             )
-            
+
             analysis = self.ai_service.call_deepseek(system_prompt, user_prompt)
-            return {"final_data": analysis}
+
+            # Мультиагентный анализ в стиле AI Hedge Fund
+            try:
+                from .hedge_fund_agents import HedgeFundAgents
+
+                summary = (
+                    f"Рынок: {market_news}\n"
+                    f"Компания: {semantic}\n"
+                    f"График: {moex_analysis}\n"
+                    f"Финансы: {ifrs_data}"
+                )
+                agents = HedgeFundAgents(self.ai_service)
+                votes = agents.analyze(state["ticker"], summary)
+            except Exception as e:
+                logger.error(f"Hedge fund agents failed {state['ticker']}: {e}")
+                votes = {}
+
+            return {"final_data": analysis, "agent_votes": votes}
             
         except (APIError, Exception) as e:
             logger.error(f"Final analysis error {state['ticker']}: {e}")
@@ -227,8 +244,13 @@ class PortfolioAnalyzer:
                 result = chain.invoke(initial_state)
                 
                 # Извлекаем рекомендацию из финального анализа более надёжным способом
-                recommendation = extract_recommendation(result["final_data"])
-                
+                votes = result.get("agent_votes", {})
+                if votes:
+                    decisions = list(votes.values())
+                    recommendation = max(set(decisions), key=decisions.count)
+                else:
+                    recommendation = extract_recommendation(result["final_data"])
+
                 analysis_result = AnalysisResult(
                     ticker=position.ticker,
                     recommendation=recommendation,
@@ -238,7 +260,8 @@ class PortfolioAnalyzer:
                         "semantic": result["semantic"],
                         "moex_analysis": result["moex_data_analysis"],
                         "ifrs_data": result["ifrs_data"],
-                        "final_decision": result["final_data"]
+                        "final_decision": result["final_data"],
+                        "agent_votes": votes,
                     }
                 )
 

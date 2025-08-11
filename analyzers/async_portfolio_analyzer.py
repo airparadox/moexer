@@ -45,7 +45,12 @@ class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
             logger.info(f"Async processing {position.ticker} with quantity {position.quantity}")
             result = await asyncio.to_thread(chain.invoke, initial_state)
 
-            recommendation = extract_recommendation(result["final_data"])
+            votes = result.get("agent_votes", {})
+            if votes:
+                decisions = list(votes.values())
+                recommendation = max(set(decisions), key=decisions.count)
+            else:
+                recommendation = extract_recommendation(result["final_data"])
 
             analysis_result = AnalysisResult(
                 ticker=position.ticker,
@@ -57,6 +62,7 @@ class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
                     "moex_analysis": result.get("moex_data_analysis", ""),
                     "ifrs_data": result.get("ifrs_data", ""),
                     "final_decision": result.get("final_data", ""),
+                    "agent_votes": votes,
                 },
             )
             try:
