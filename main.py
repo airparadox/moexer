@@ -10,6 +10,7 @@ from utils import (
     log_performance_summary,
     calculate_portfolio_value,
     get_performance_report,
+    performance_monitor,
 )
 from datetime import datetime
 import os
@@ -271,6 +272,86 @@ def save_full_report(results: dict, start_time: datetime) -> str:
         f.write(full_report)
     return path
 
+
+def generate_html_report(results: dict) -> str:
+    """Создает HTML-отчет с таблицами по результатам анализа."""
+    if "error" in results:
+        return f"<html><body><h2>Ошибка</h2><p>{results['error']}</p></body></html>"
+
+    summary = results["portfolio_summary"]
+    html_parts = [
+        "<html><head><meta charset='utf-8'><style>",
+        "table{border-collapse:collapse;}th,td{border:1px solid #ccc;padding:4px;}th{background:#f0f0f0;}",
+        "</style></head><body>",
+        "<h1>📊 Сводка по портфелю</h1>",
+        "<table>",
+    ]
+
+    summary_rows = {
+        "Всего позиций": summary.get("total_positions"),
+        "К покупке": summary.get("buy_recommendations"),
+        "Держать": summary.get("hold_recommendations"),
+        "К продаже": summary.get("sell_recommendations"),
+        "Средняя уверенность": f"{summary.get('average_confidence', float('nan')):.2f}",
+        "Общая стратегия": summary.get("portfolio_action"),
+    }
+    if "risk_profile" in summary:
+        summary_rows["Тип инвестора"] = summary["risk_profile"]
+    if "total_value" in summary:
+        summary_rows["Стоимость портфеля"] = f"{summary['total_value']:.2f} руб."
+    if "cash_rub" in summary:
+        summary_rows["Свободные средства"] = f"{summary['cash_rub']:.2f} руб."
+
+    for key, value in summary_rows.items():
+        html_parts.append(f"<tr><th>{key}</th><td>{value}</td></tr>")
+    html_parts.append("</table>")
+
+    html_parts.extend(["<h1>📈 Детальный анализ по тикерам</h1>", "<table>",
+                       "<tr><th>Тикер</th><th>Количество</th><th>Решение</th><th>Ребалансировка</th><th>Downside risk</th><th>Sortino ratio</th><th>Omega ratio</th></tr>"])
+
+    for ticker, data in results["analysis_results"].items():
+        pmpt = data["details"].get("pmpt", {})
+        html_parts.append(
+            "<tr>" +
+            f"<td>{ticker}</td>" +
+            f"<td>{data['quantity']}</td>" +
+            f"<td>{data['decision']}</td>" +
+            f"<td>{results['rebalancing_suggestions'][ticker]}</td>" +
+            f"<td>{pmpt.get('downside_risk', float('nan')):.4f}</td>" +
+            f"<td>{pmpt.get('sortino_ratio', float('nan')):.4f}</td>" +
+            f"<td>{pmpt.get('omega_ratio', float('nan')):.4f}</td>" +
+            "</tr>"
+        )
+    html_parts.append("</table>")
+
+    metrics = performance_monitor.get_metrics_summary()
+    html_parts.extend(["<h1>📊 Отчет о производительности</h1>", "<table>",
+                       "<tr><th>Сервис</th><th>Среднее время</th><th>Процент успеха</th><th>Количество вызовов</th></tr>"])
+
+    for service, data in metrics.get("services", {}).items():
+        html_parts.append(
+            "<tr>" +
+            f"<td>{service}</td>" +
+            f"<td>{data['average_execution_time']:.3f}s</td>" +
+            f"<td>{data['success_rate']:.1f}%</td>" +
+            f"<td>{data['total_calls']}</td>" +
+            "</tr>"
+        )
+    html_parts.append("</table></body></html>")
+
+    return "".join(html_parts)
+
+
+def save_html_report(results: dict, start_time: datetime) -> str:
+    """Сохраняет отчет в формате HTML."""
+    html_report = generate_html_report(results)
+    os.makedirs("reports", exist_ok=True)
+    file_name = start_time.strftime("report_%Y%m%d_%H%M%S.html")
+    path = os.path.join("reports", file_name)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html_report)
+    return path
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Portfolio analyzer")
     parser.add_argument(
@@ -321,4 +402,6 @@ if __name__ == "__main__":
     log_performance_summary()
 
     report_path = save_full_report(results, start_time)
+    html_report_path = save_html_report(results, start_time)
     print(f"\n💾 Отчет сохранен в {report_path}")
+    print(f"🌐 HTML-отчет сохранен в {html_report_path}")
