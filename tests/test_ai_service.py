@@ -1,5 +1,6 @@
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
+
 from services.ai_service import AIService
 from utils.helpers import APIError
 
@@ -70,3 +71,13 @@ class TestAIService:
         with patch('time.sleep'):  # Мокаем sleep для ускорения тестов
             result = ai_service.call_deepseek("system", "user")
             assert "Success after retry" in result or "Ошибка анализа" in result
+
+    @patch('services.ai_service.wrap_openai')
+    @patch('services.ai_service.OpenAI')
+    def test_wrap_openai_called_when_langsmith_enabled(self, mock_openai, mock_wrap):
+        """Проверяем, что wrap_openai вызывается при активном LangSmith"""
+        mock_openai.return_value.chat.completions.create.return_value = Mock(choices=[Mock(message=Mock(content="resp"))])
+        with patch.dict('os.environ', {'DEEPSEEK_API_KEY': 'test_key', 'LANGCHAIN_API_KEY': 'ls_key'}):
+            service = AIService()
+            service.call_deepseek("sys", "usr")
+        mock_wrap.assert_called_once()

@@ -1,7 +1,10 @@
 import logging
-from openai import OpenAI
-from typing import Optional
 import os
+from typing import Optional
+
+from openai import OpenAI
+from langsmith.wrappers import wrap_openai
+
 from config import settings
 from utils.helpers import retry_on_failure, APIError
 from utils.monitoring import monitor_performance
@@ -20,10 +23,13 @@ class AIService:
 
     def _ensure_client(self):
         if self.client is None:
-            self.client = OpenAI(
+            client = OpenAI(
                 api_key=self.api_key,
                 base_url=settings.deepseek_base_url,
             )
+            if os.getenv("LANGCHAIN_API_KEY") or os.getenv("LANGSMITH_API_KEY"):
+                client = wrap_openai(client)
+            self.client = client
     
     @monitor_performance("ai_service")
     @retry_on_failure(max_retries=settings.max_retries)
