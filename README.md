@@ -1,6 +1,6 @@
 # Анализ портфеля акций
 
-Этот проект представляет собой инструмент для анализа портфеля акций, использующий данные из различных источников (Tinkoff Pulse, MOEX, новостные ленты, отчетность МСФО) и искусственный интеллект (DeepSeek API) для формирования инвестиционных рекомендаций.
+Этот проект представляет собой инструмент для анализа портфеля акций, использующий данные из различных источников (Tinkoff Pulse, MOEX, новостные ленты, отчетность МСФО) и искусственный интеллект (DeepSeek API или локальный Ollama) для формирования инвестиционных рекомендаций.
 
 ## Основные возможности
 - Сбор новостей по тикерам из Tinkoff Pulse
@@ -49,10 +49,18 @@ python main.py --file portfolio.json --risk-profile тип_портфеля
 pip install -r requirements.txt
 ```
 
-Создайте файл `.env` и укажите обязательный ключ API:
+Создайте файл `.env` и укажите необходимые ключи и настройки:
 ```env
+LLM_PROVIDER=deepseek                 # или 'ollama'
+
+# DeepSeek
 DEEPSEEK_API_KEY=your_actual_key
 DEEPSEEK_MODEL=deepseek-reasoner или deepseek-chat
+
+# Локальная Ollama
+OLLAMA_MODEL=llama3:8b
+OLLAMA_BASE_URL=http://localhost:11434
+
 # Опционально: включение трасировки LangSmith
 LANGCHAIN_API_KEY=your_langsmith_key
 ```

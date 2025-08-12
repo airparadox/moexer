@@ -13,7 +13,7 @@ portfolio_analyzer/
 │   └── state.py           # Portfolio, AnalysisResult
 ├── services/              # Сервисный слой
 │   ├── __init__.py
-│   ├── ai_service.py      # DeepSeek API
+│   ├── ai_service.py      # LLM API (DeepSeek/Ollama)
 │   ├── news_service.py    # Новости (Lenta.ru, Tinkoff Pulse)
 │   ├── moex_service.py    # Данные MOEX
 │   └── ifrs_service.py    # IFRS отчетность
@@ -56,10 +56,17 @@ cp .env.example .env
 
 Отредактируйте `.env`:
 ```env
+# LLM provider configuration
+LLM_PROVIDER=deepseek              # или 'ollama'
+
 # DeepSeek API Configuration
 DEEPSEEK_API_KEY=your_actual_api_key_here
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_BASE_URL=https://api.deepseek.com
+
+# Local Ollama configuration
+OLLAMA_MODEL=llama3:8b
+OLLAMA_BASE_URL=http://localhost:11434
 
 # Analysis Parameters
 NEWS_DAYS_LOOKBACK=1

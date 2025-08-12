@@ -41,7 +41,7 @@ class PortfolioAnalyzer:
                 system_prompt = "Анализ новостей рынка. Формат: Настрой, Факторы, Влияние"
                 user_prompt = f"Новости:\n{news_entries}"
                 
-                analysis = self.ai_service.call_deepseek(system_prompt, user_prompt)
+                analysis = self.ai_service.call_model(system_prompt, user_prompt)
                 return {"market_news": analysis}
             
             return {"market_news": "Недостаточно свежих новостей для анализа"}
@@ -70,7 +70,7 @@ class PortfolioAnalyzer:
             system_prompt = "Анализ новостей компании. Формат: Настрой, Ключевое, Риски"
             user_prompt = f"Новости {state['ticker']}:\n{state['news']}"
             
-            analysis = self.ai_service.call_deepseek(system_prompt, user_prompt)
+            analysis = self.ai_service.call_model(system_prompt, user_prompt)
             return {"semantic": analysis}
             
         except (APIError, Exception) as e:
@@ -100,7 +100,7 @@ class PortfolioAnalyzer:
             recent_data = self.moex_service.get_recent_data(state['ticker'], 180)
             user_prompt = f"Данные {state['ticker']}:\n{recent_data}"
             
-            analysis = self.ai_service.call_deepseek(system_prompt, user_prompt)
+            analysis = self.ai_service.call_model(system_prompt, user_prompt)
             return {"moex_data_analysis": analysis}
             
         except (APIError, Exception) as e:
@@ -119,7 +119,7 @@ class PortfolioAnalyzer:
             system_prompt = "Анализ МСФО. Формат: Финансы, Рентабельность, Долги"
             user_prompt = f"Отчетность {state['ticker']}:\n{ifrs_content}"
             
-            analysis = self.ai_service.call_deepseek(system_prompt, user_prompt)
+            analysis = self.ai_service.call_model(system_prompt, user_prompt)
             return {"ifrs_data": analysis}
             
         except (APIError, DataProcessingError, Exception) as e:
@@ -162,7 +162,7 @@ class PortfolioAnalyzer:
                 f"Тип инвестора: {risk}. {goal_map.get(risk, '')}"
             )
 
-            analysis = self.ai_service.call_deepseek(system_prompt, user_prompt)
+            analysis = self.ai_service.call_model(system_prompt, user_prompt)
 
             # Мультиагентный анализ в стиле AI Hedge Fund
             try:
