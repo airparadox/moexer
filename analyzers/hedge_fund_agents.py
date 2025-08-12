@@ -43,7 +43,7 @@ class HedgeFundAgents:
                     "Ответь в формате: КУПИТЬ/ДЕРЖАТЬ/ПРОДАТЬ и короткое обоснование."
                 )
                 user_prompt = f"Анализ по {ticker}:\n{summary}"
-                response = self.ai_service.call_deepseek(system_prompt, user_prompt)
+                response = self.ai_service.call_model(system_prompt, user_prompt)
                 votes[agent.name] = extract_recommendation(response)
             except Exception as e:
                 logger.error(f"Agent {agent.name} failed: {e}")

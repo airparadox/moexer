@@ -83,13 +83,17 @@ class DataProcessingError(Exception):
 
 #### Рекомендации:
 ```python
+import os
 from pydantic import BaseSettings, validator
 from typing import Optional
 
 class Settings(BaseSettings):
-    deepseek_api_key: str
+    llm_provider: str = os.getenv("LLM_PROVIDER", "deepseek")
+    deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "")
     deepseek_model: str = "deepseek-chat"
     deepseek_base_url: str = "https://api.deepseek.com"
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3:8b")
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     
     # Параметры анализа
     news_days_lookback: int = 1
@@ -105,8 +109,8 @@ class Settings(BaseSettings):
         env_file = ".env"
         
     @validator('deepseek_api_key')
-    def validate_api_key(cls, v):
-        if not v:
+    def validate_api_key(cls, v, values):
+        if values.get('llm_provider') == 'deepseek' and not v:
             raise ValueError('DEEPSEEK_API_KEY must be set')
         return v
 
@@ -208,21 +212,21 @@ class TestAIService:
         return AIService(api_key="test_key")
     
     @patch('portfolio_analyzer.services.ai_service.OpenAI')
-    def test_call_deepseek_success(self, mock_openai, ai_service):
+    def test_call_model_success(self, mock_openai, ai_service):
         # Мок успешного ответа
         mock_response = Mock()
         mock_response.choices[0].message.content = "Test response"
         mock_openai.return_value.chat.completions.create.return_value = mock_response
         
-        result = ai_service.call_deepseek("system", "user")
+        result = ai_service.call_model("system", "user")
         assert result == "Test response"
     
     @patch('portfolio_analyzer.services.ai_service.OpenAI')
-    def test_call_deepseek_api_error(self, mock_openai, ai_service):
+    def test_call_model_api_error(self, mock_openai, ai_service):
         # Тест обработки ошибок API
         mock_openai.return_value.chat.completions.create.side_effect = Exception("API Error")
         
-        result = ai_service.call_deepseek("system", "user")
+        result = ai_service.call_model("system", "user")
         assert "Ошибка анализа" in result
 ```
 

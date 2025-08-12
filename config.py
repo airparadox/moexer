@@ -1,6 +1,5 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import validator
 
 
 class Settings(BaseSettings):
@@ -9,9 +8,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     log_level: str = "INFO"  # Default value
-    deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "dummy")
+
+    # LLM provider configuration
+    llm_provider: str = os.getenv("LLM_PROVIDER", "deepseek")
+    deepseek_api_key: str | None = os.getenv("DEEPSEEK_API_KEY")
     deepseek_model: str = "deepseek-chat"
     deepseek_base_url: str = "https://api.deepseek.com"
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3:8b")
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     
     # Параметры анализа
     news_days_lookback: int = 1
@@ -23,10 +27,5 @@ class Settings(BaseSettings):
     api_timeout: int = 30
     max_retries: int = 3
     
-    @validator('deepseek_api_key')
-    def validate_api_key(cls, v):
-        if not v:
-            raise ValueError('DEEPSEEK_API_KEY must be set')
-        return v
 
 settings = Settings()
