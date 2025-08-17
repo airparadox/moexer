@@ -21,6 +21,14 @@ from utils.pmpt import pmpt_metrics
 
 logger = logging.getLogger(__name__)
 
+# Веса источников данных для финального анализа
+WEIGHTS = {
+    "ifrs": 0.55,            # МСФО-отчётность, фундаментал
+    "market_news": 0.20,     # Новости от информагентств
+    "moex": 0.15,            # Биржевые данные (объёмы, ликвидность)
+    "social": 0.10,          # Соцсети
+}
+
 class PortfolioAnalyzer:
     """Основной класс для анализа портфеля"""
 
@@ -130,16 +138,25 @@ class PortfolioAnalyzer:
     def final_analysis(self, state: State) -> dict:
         """Финальный анализ и рекомендация"""
         try:
+            weight_text = (
+                f"МСФО и фундаментал — {WEIGHTS['ifrs']*100:.0f}%, "
+                f"новости от информагентств — {WEIGHTS['market_news']*100:.0f}%, "
+                f"биржевые данные (объёмы, ликвидность) — {WEIGHTS['moex']*100:.0f}%, "
+                f"соцсети — {WEIGHTS['social']*100:.0f}%"
+            )
+
             if state["quantity"] == 0:
                 system_prompt = (
                     "Рекомендация к покупке: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ с пояснением. "
-                    "ДЕРЖАТЬ означает воздержаться от покупки."
+                    "ДЕРЖАТЬ означает воздержаться от покупки. "
+                    f"Учти веса источников данных: {weight_text}."
                 )
             else:
                 system_prompt = (
-                    "Рекомендация по текущей позиции: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ с пояснением"
+                    "Рекомендация по текущей позиции: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ с пояснением. "
+                    f"Учти веса источников данных: {weight_text}."
                 )
-            
+
             # Ограничиваем длину каждого блока данных
             market_news = truncate_text(state['market_news'], 3000)
             semantic = truncate_text(state['semantic'], 3000)
@@ -155,10 +172,10 @@ class PortfolioAnalyzer:
 
             user_prompt = (
                 f"Сводка по {state['ticker']}:\n"
-                f"- Рынок: {market_news}\n"
-                f"- Компания: {semantic}\n"
-                f"- График: {moex_analysis}\n"
-                f"- Финансы: {ifrs_data}\n"
+                f"- Финансы (вес {WEIGHTS['ifrs']*100:.0f}%): {ifrs_data}\n"
+                f"- Новости от информагентств (вес {WEIGHTS['market_news']*100:.0f}%): {market_news}\n"
+                f"- Биржевые данные (вес {WEIGHTS['moex']*100:.0f}%): {moex_analysis}\n"
+                f"- Соцсети (вес {WEIGHTS['social']*100:.0f}%): {semantic}\n"
                 f"Тип инвестора: {risk}. {goal_map.get(risk, '')}"
             )
 
