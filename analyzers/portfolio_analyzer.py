@@ -135,33 +135,11 @@ class PortfolioAnalyzer:
             return {"ifrs_data": "Ошибка анализа МСФО"}
 
     @traceable
+
     def final_analysis(self, state: State) -> dict:
         """Финальный анализ и рекомендация"""
         try:
-            weight_text = (
-                f"МСФО и фундаментал — {WEIGHTS['ifrs']*100:.0f}%, "
-                f"новости от информагентств — {WEIGHTS['market_news']*100:.0f}%, "
-                f"биржевые данные (объёмы, ликвидность) — {WEIGHTS['moex']*100:.0f}%, "
-                f"соцсети — {WEIGHTS['social']*100:.0f}%"
-            )
-
-            if state["quantity"] == 0:
-                system_prompt = (
-                    "Рекомендация к покупке: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ с пояснением. "
-                    "ДЕРЖАТЬ означает воздержаться от покупки. "
-                    f"Учти веса источников данных: {weight_text}."
-                )
-            else:
-                system_prompt = (
-                    "Рекомендация по текущей позиции: КУПИТЬ/ДЕРЖАТЬ/ПРОДАВАТЬ с пояснением. "
-                    f"Учти веса источников данных: {weight_text}."
-                )
-
-            # Ограничиваем длину каждого блока данных
-            market_news = truncate_text(state['market_news'], 3000)
-            semantic = truncate_text(state['semantic'], 3000)
-            moex_analysis = truncate_text(state['moex_data_analysis'], 3000)
-            ifrs_data = truncate_text(state['ifrs_data'], 3000)
+            # 1) Сначала всё, что нужно для форматирования
             risk = state.get('risk_profile', RiskProfile.BALANCED.value)
             goal_map = {
                 RiskProfile.CONSERVATIVE.value: "Цель: стабильный доход и минимум риска",
@@ -169,6 +147,31 @@ class PortfolioAnalyzer:
                 RiskProfile.AGGRESSIVE.value: "Цель: максимальный рост, готовность к риску",
                 RiskProfile.SPECULATIVE.value: "Цель: активные спекуляции и частая ребалансировка",
             }
+
+            # 2) Ограничиваем длину блоков данных
+            market_news = truncate_text(state.get('market_news', ''), 3000)
+            semantic = truncate_text(state.get('semantic', ''), 3000)
+            moex_analysis = truncate_text(state.get('moex_data_analysis', ''), 3000)
+            ifrs_data = truncate_text(state.get('ifrs_data', ''), 3000)
+
+            # 3) Формируем подсказки
+            system_prompt = (
+                "Ты — инвестиционный директор хедж-фонда."
+                " Твоя задача: на основе данных о компании и рыночной ситуации подготовить финальную рекомендацию в формате:\n"
+                "- КУПИТЬ / ДЕРЖАТЬ / ПРОДАВАТЬ (выбери строго одно действие)\n"
+                "- Краткое объяснение на 2–3 предложения для управляющего портфелем\n\n"
+                "Правила:\n"
+                "1. Всегда учитывай весовые коэффициенты источников данных:\n"
+                f"- МСФО и фундаментал — {WEIGHTS['ifrs']*100:.0f}%\n"
+                f"- Новости агентств — {WEIGHTS['market_news']*100:.0f}%\n"
+                f"- Биржевые данные — {WEIGHTS['moex']*100:.0f}%\n"
+                f"- Соцсети — {WEIGHTS['social']*100:.0f}%\n"
+                "2. Если позиция ещё не открыта → рекомендация: КУПИТЬ / ДЕРЖАТЬ / ПРОДАВАТЬ (где ДЕРЖАТЬ означает «воздержаться от покупки»).\n"
+                "3. Если позиция уже есть → рекомендация: УВЕЛИЧИТЬ / СОКРАТИТЬ / ДЕРЖАТЬ.\n"
+                f"4. Учитывай профиль инвестора: {risk}. {goal_map.get(risk, '')}\n"
+                "5. Форматируй ответ чётко, без воды.\n\n"
+                "Стиль ответа: как на заседании инвестиционного комитета хедж-фонда."
+            )
 
             user_prompt = (
                 f"Сводка по {state['ticker']}:\n"
@@ -179,12 +182,11 @@ class PortfolioAnalyzer:
                 f"Тип инвестора: {risk}. {goal_map.get(risk, '')}"
             )
 
-            analysis = self.ai_service.call_model(system_prompt, user_prompt)
+            analysis = self.ai_service.call_model(system_prompt, user_prompt) or "Нет ответа модели"
 
-            # Мультиагентный анализ в стиле AI Hedge Fund
+            # Мультиагентный анализ (не обязательно критичен)
             try:
                 from .hedge_fund_agents import HedgeFundAgents
-
                 summary = (
                     f"Рынок: {market_news}\n"
                     f"Компания: {semantic}\n"
@@ -198,10 +200,11 @@ class PortfolioAnalyzer:
                 votes = {}
 
             return {"final_data": analysis, "agent_votes": votes}
-            
+
         except (APIError, Exception) as e:
             logger.error(f"Final analysis error {state['ticker']}: {e}")
             return {"final_data": "Ошибка финального анализа"}
+
 
     def analyze_portfolio(self, portfolio: Portfolio) -> Dict[str, AnalysisResult]:
         """
