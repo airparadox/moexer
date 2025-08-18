@@ -280,8 +280,10 @@ def generate_html_report(results: dict) -> str:
 
     summary = results["portfolio_summary"]
     html_parts = [
-        "<html><head><meta charset='utf-8'><style>",
-        "table{border-collapse:collapse;}th,td{border:1px solid #ccc;padding:4px;}th{background:#f0f0f0;}",
+        "<html><head><meta charset='utf-8'>",
+        "<meta name='viewport' content='width=device-width, initial-scale=1'><style>",
+        "body{max-width:800px;margin:0 auto;padding:10px;}",
+        "table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:4px;}th{background:#f0f0f0;}",
         "</style></head><body>",
         "<h1>📊 Сводка по портфелю</h1>",
         "<table>",
