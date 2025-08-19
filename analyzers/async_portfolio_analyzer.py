@@ -46,11 +46,8 @@ class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
             result = await asyncio.to_thread(chain.invoke, initial_state)
 
             votes = result.get("agent_votes", {})
-            if votes:
-                decisions = list(votes.values())
-                recommendation = max(set(decisions), key=decisions.count)
-            else:
-                recommendation = extract_recommendation(result["final_data"])
+            # Рекомендация должна основываться на финальном тексте анализа
+            recommendation = extract_recommendation(result["final_data"])
 
             analysis_result = AnalysisResult(
                 ticker=position.ticker,
