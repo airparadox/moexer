@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 from services.ai_service import AIService
-from utils.helpers import extract_recommendation
+from utils.helpers import extract_recommendation, extract_confidence
 
 logger = logging.getLogger(__name__)
 
@@ -53,50 +53,36 @@ class HedgeFundAgents:
         ),
         ]
 
-    def analyze(self, ticker: str, summary: str) -> Dict[str, str]:
-        """Возвращает рекомендации каждого агента."""
+    def analyze(self, ticker: str, summary: str) -> tuple[Dict[str, str], Dict[str, float]]:
+        """Возвращает рекомендации и уверенности каждого агента."""
         votes: Dict[str, str] = {}
+        confidences: Dict[str, float] = {}
         for agent in self.agents:
             try:
-                # system_prompt = (
-                #     f"Ты {agent.name}, {agent.description}. "
-                #     "Ответь в формате: КУПИТЬ/ДЕРЖАТЬ/ПРОДАТЬ и короткое обоснование."
-                # )
-
                 system_prompt = (
-                f"Ты выступаешь как {agent.name} — {agent.description}."
-                f"Но ты НЕ можешь ссылаться на свою репутацию или прошлые кейсы; решение принимается ТОЛЬКО по предоставленным данным и весам источников."
-
-                f"В начале ответа выведи РОВНО ОДНО слово (большими буквами):"
-                f"КУПИТЬ / ДЕРЖАТЬ / ПРОДАВАТЬ"
-
-                f"Далее выдай:"
-                f"Уверенность: X/100"
-                f"Доводы (до 3 пунктов):"
-                f"- [TAG] кратко по сути, строго из данных"
-                f"Красные флаги (до 2):"
-                f"- [TAG] кратко"
-                f"Горизонт: кратко (например, 3–6 мес)"
-
-                f"Общие правила:"
-                f"1) Учитывай веса источников: [IFRS, NEWS, MOEX, SOCIAL]."
-                f"2) При конфликте данных приоритизируй по весам. При равенстве — ДЕРЖАТЬ."
-                f"3) Не выдумывай фактов. Если чего-то не хватает — понижай уверенность."
-
+                    f"Ты выступаешь как {agent.name} — {agent.description}."
+                    f"Но ты НЕ можешь ссылаться на свою репутацию или прошлые кейсы; решение принимается ТОЛЬКО по предоставленным данным и весам источников."
+                    f"В начале ответа выведи РОВНО ОДНО слово (большими буквами):"
+                    f"КУПИТЬ / ДЕРЖАТЬ / ПРОДАВАТЬ"
+                    f"Далее выдай:"
+                    f"Уверенность: X/100"
+                    f"Доводы (до 3 пунктов):"
+                    f"- [TAG] кратко по сути, строго из данных"
+                    f"Красные флаги (до 2):"
+                    f"- [TAG] кратко"
+                    f"Горизонт: кратко (например, 3–6 мес)"
+                    f"Общие правила:"
+                    f"1) Учитывай веса источников: [IFRS, NEWS, MOEX, SOCIAL]."
+                    f"2) При конфликте данных приоритизируй по весам. При равенстве — ДЕРЖАТЬ."
+                    f"3) Не выдумывай фактов. Если чего-то не хватает — понижай уверенность."
                 )
 
-
-
-
                 user_prompt = f"Анализ по {ticker}:\n{summary}"
-
-
-
-
-
                 response = self.ai_service.call_model(system_prompt, user_prompt)
                 votes[agent.name] = extract_recommendation(response)
+                confidences[agent.name] = extract_confidence(response)
             except Exception as e:
                 logger.error(f"Agent {agent.name} failed: {e}")
                 votes[agent.name] = "ДЕРЖАТЬ"
-        return votes
+                confidences[agent.name] = 0.0
+        return votes, confidences

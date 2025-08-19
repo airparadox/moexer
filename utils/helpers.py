@@ -69,3 +69,12 @@ def extract_recommendation(text: str) -> str:
     if "КУПИТЬ" in text:
         return "КУПИТЬ"
     return "ДЕРЖАТЬ"
+
+
+def extract_confidence(text: str) -> float:
+    """Извлекает числовое значение уверенности (0-1) из текста ответа."""
+    match = re.search(r"Уверенность[:\uFF1A]?\s*(\d{1,3})\s*/\s*100", text)
+    if match:
+        value = int(match.group(1))
+        return max(0.0, min(1.0, value / 100))
+    return 0.0

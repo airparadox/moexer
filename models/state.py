@@ -4,7 +4,8 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
-class State(TypedDict):
+
+class State(TypedDict, total=False):
     ticker: str
     quantity: int
     news: str
@@ -15,6 +16,8 @@ class State(TypedDict):
     final_data: str
     market_news: str
     risk_profile: str
+    agent_votes: Dict[str, str]
+    agent_confidences: Dict[str, float]
 
 class PortfolioPosition(BaseModel):
     ticker: str
