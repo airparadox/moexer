@@ -270,11 +270,8 @@ class PortfolioAnalyzer:
                 # Извлекаем рекомендацию из финального анализа более надёжным способом
                 votes = result.get("agent_votes", {})
                 confidences = result.get("agent_confidences", {})
-                if votes:
-                    decisions = list(votes.values())
-                    recommendation = max(set(decisions), key=decisions.count)
-                else:
-                    recommendation = extract_recommendation(result["final_data"])
+                # Рекомендация должна соответствовать финальному решению
+                recommendation = extract_recommendation(result["final_data"])
 
                 if confidences:
                     confidence = sum(confidences.values()) / len(confidences)
