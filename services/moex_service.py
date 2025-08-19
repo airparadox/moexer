@@ -1,18 +1,41 @@
 import logging
-import requests
-import pandas as pd
-import apimoex
 from datetime import datetime, timedelta
-from typing import Optional
 from functools import lru_cache
-from utils.helpers import retry_on_failure, APIError
+from pathlib import Path
+from typing import Optional
+
+import apimoex
+import pandas as pd
+import requests
+
+from utils.helpers import APIError, retry_on_failure
 from config import settings
 
 logger = logging.getLogger(__name__)
 
 class MOEXService:
     """Сервис для работы с данными MOEX"""
-    
+
+    @lru_cache(maxsize=1)
+    def _load_dividend_calendar(self) -> pd.DataFrame:
+        """Загружает календарь дивидендных отсечек."""
+        path = Path(__file__).resolve().parent.parent / "finance" / "dividend.txt"
+        try:
+            df = pd.read_csv(
+                path,
+                sep=r"\s+",
+                engine="python",
+                encoding="utf-8",
+                names=["dDate", "sTicker"],
+                header=0,
+            )
+            df["dDate"] = pd.to_datetime(df["dDate"], format="%d.%m.%Y", errors="coerce")
+            df["sTicker"] = df["sTicker"].str.strip().str.upper()
+            return df
+        except Exception as e:
+            logger.error(f"Failed to load dividend calendar: {e}")
+            return pd.DataFrame(columns=["dDate", "sTicker"])
+
     @lru_cache(maxsize=128)
     @retry_on_failure(max_retries=settings.max_retries)
     def get_ticker_data(self, ticker: str, days_back: Optional[int] = None) -> pd.DataFrame:
@@ -45,6 +68,16 @@ class MOEXService:
                     raise ValueError(f"No data available for ticker {ticker}")
                 
                 df = pd.DataFrame(data)[['TRADEDATE', 'CLOSE', 'VOLUME', 'VALUE']]
+                df['TRADEDATE'] = pd.to_datetime(df['TRADEDATE'])
+
+                # Помечаем даты дивидендных отсечек
+                calendar = self._load_dividend_calendar()
+                divs = calendar[calendar['sTicker'] == ticker.upper()][['dDate']]
+                divs = divs.rename(columns={'dDate': 'TRADEDATE'})
+                divs['IS_DIVIDEND_DAY'] = True
+                df = df.merge(divs, on='TRADEDATE', how='left')
+                df['IS_DIVIDEND_DAY'] = df['IS_DIVIDEND_DAY'].fillna(False)
+
                 return df
                 
         except Exception as e:
