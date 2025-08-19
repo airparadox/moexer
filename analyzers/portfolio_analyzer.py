@@ -194,12 +194,16 @@ class PortfolioAnalyzer:
                     f"Финансы: {ifrs_data}"
                 )
                 agents = HedgeFundAgents(self.ai_service)
-                votes = agents.analyze(state["ticker"], summary)
+                votes, confidences = agents.analyze(state["ticker"], summary)
             except Exception as e:
                 logger.error(f"Hedge fund agents failed {state['ticker']}: {e}")
-                votes = {}
+                votes, confidences = {}, {}
 
-            return {"final_data": analysis, "agent_votes": votes}
+            return {
+                "final_data": analysis,
+                "agent_votes": votes,
+                "agent_confidences": confidences,
+            }
 
         except (APIError, Exception) as e:
             logger.error(f"Final analysis error {state['ticker']}: {e}")
@@ -265,16 +269,22 @@ class PortfolioAnalyzer:
                 
                 # Извлекаем рекомендацию из финального анализа более надёжным способом
                 votes = result.get("agent_votes", {})
+                confidences = result.get("agent_confidences", {})
                 if votes:
                     decisions = list(votes.values())
                     recommendation = max(set(decisions), key=decisions.count)
                 else:
                     recommendation = extract_recommendation(result["final_data"])
 
+                if confidences:
+                    confidence = sum(confidences.values()) / len(confidences)
+                else:
+                    confidence = 0.0
+
                 analysis_result = AnalysisResult(
                     ticker=position.ticker,
                     recommendation=recommendation,
-                    confidence=0.8,  # базовый уровень уверенности
+                    confidence=confidence,
                     analysis_data={
                         "market_news": result["market_news"],
                         "semantic": result["semantic"],
@@ -282,6 +292,7 @@ class PortfolioAnalyzer:
                         "ifrs_data": result["ifrs_data"],
                         "final_decision": result["final_data"],
                         "agent_votes": votes,
+                        "agent_confidences": confidences,
                     }
                 )
 
