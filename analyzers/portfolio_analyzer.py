@@ -102,7 +102,11 @@ class PortfolioAnalyzer:
             if state['moex_data'] == "Ошибка получения данных MOEX":
                 return {"moex_data_analysis": "Невозможно провести технический анализ"}
             
-            system_prompt = "Теханализ. Формат: Тренд, Объемы, Волатильность"
+            system_prompt = (
+                "Теханализ. Формат: Тренд, Объемы, Волатильность."
+                " Учитывай колонку IS_DIVIDEND_DAY: резкие падения в эти даты"
+                " могут быть связаны с дивидендной отсечкой"
+            )
             
             # Используем сервис для получения последних 180 дней
             recent_data = self.moex_service.get_recent_data(state['ticker'], 180)
