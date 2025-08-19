@@ -46,13 +46,20 @@ class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
             result = await asyncio.to_thread(chain.invoke, initial_state)
 
             votes = result.get("agent_votes", {})
+            confidences = result.get("agent_confidences", {})
+
             # Рекомендация должна основываться на финальном тексте анализа
             recommendation = extract_recommendation(result["final_data"])
+            confidence = (
+                sum(confidences.values()) / len(confidences)
+                if confidences
+                else 0.0
+            )
 
             analysis_result = AnalysisResult(
                 ticker=position.ticker,
                 recommendation=recommendation,
-                confidence=0.8,
+                confidence=confidence,
                 analysis_data={
                     "market_news": result.get("market_news", ""),
                     "semantic": result.get("semantic", ""),
@@ -60,6 +67,7 @@ class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
                     "ifrs_data": result.get("ifrs_data", ""),
                     "final_decision": result.get("final_data", ""),
                     "agent_votes": votes,
+                    "agent_confidences": confidences,
                 },
             )
             try:
