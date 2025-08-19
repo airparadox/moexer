@@ -27,6 +27,7 @@ MANIFEST
 
 # Файлы окружения и настройки IDE
 .env
+.log/
 .idea/
 .vscode/
 .gigaide/

@@ -2,7 +2,6 @@ import logging
 import asyncio
 import json
 import argparse
-from dotenv import load_dotenv
 
 from models import Portfolio, RiskProfile
 from analyzers import PortfolioAnalyzer, RebalancingAnalyzer, AsyncPortfolioAnalyzer
@@ -15,12 +14,11 @@ from utils import (
 from datetime import datetime
 import os
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from utils.logging_config import setup_logging
 
-# Загружаем переменные окружения
-load_dotenv()
+# Настройка логирования
+setup_logging()
+logger = logging.getLogger(__name__)
 
 def load_portfolio_from_file(file_path: str) -> dict:
     """Загружает портфель из JSON-файла."""
