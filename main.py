@@ -3,7 +3,11 @@ import asyncio
 import json
 import argparse
 
-from models import Portfolio, RiskProfile
+from models import (
+    Portfolio,
+    RiskProfile,
+    RecommendationRecord,
+)
 from analyzers import PortfolioAnalyzer, RebalancingAnalyzer, AsyncPortfolioAnalyzer
 from utils import (
     log_performance_summary,
@@ -11,6 +15,7 @@ from utils import (
     get_performance_report,
     performance_monitor,
 )
+from services import RecommendationDB, MOEXService
 from datetime import datetime
 import os
 
@@ -204,6 +209,24 @@ def print_analysis_results(results: dict):
         print(f"{ticker:<6} {action}")
 
 
+def save_recommendations_to_db(results: dict) -> None:
+    """Сохраняет рекомендации в локальную БД."""
+    db = RecommendationDB()
+    moex = MOEXService()
+    now = datetime.now()
+    for ticker, data in results.get("analysis_results", {}).items():
+        price = moex.get_latest_price(ticker)
+        record = RecommendationRecord(
+            ticker=ticker,
+            recommendation=data["recommendation"],
+            confidence=data["confidence"],
+            price=price,
+            timestamp=now,
+        )
+        db.save(record)
+    db.close()
+
+
 def generate_analysis_report(results: dict) -> str:
     """Формирует текстовый отчет по результатам анализа."""
     if "error" in results:
@@ -391,7 +414,10 @@ if __name__ == "__main__":
             "rebalancing_suggestions": {},
             "portfolio_summary": {"error": "Ошибка анализа"},
         }
-    
+
+    # Сохраняем рекомендации
+    save_recommendations_to_db(results)
+
     # Выводим результаты
     print_analysis_results(results)
 

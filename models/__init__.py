@@ -5,6 +5,7 @@ from .state import (
     AnalysisResult,
     RiskProfile,
 )
+from .recommendation import RecommendationRecord
 
 __all__ = [
     'State',
@@ -12,4 +13,5 @@ __all__ = [
     'PortfolioPosition',
     'AnalysisResult',
     'RiskProfile',
+    'RecommendationRecord',
 ]
