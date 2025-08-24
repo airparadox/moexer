@@ -1,6 +1,6 @@
 import pytest
 from analyzers import RebalancingAnalyzer
-from models import Portfolio, PortfolioPosition, AnalysisResult
+from models import Portfolio, AnalysisResult
 
 
 def test_suggest_rebalancing_with_cash():
@@ -35,4 +35,5 @@ def test_rebalancing_zero_quantity_sell():
     analyzer = RebalancingAnalyzer(price_getter=lambda t: 100.0)
     result = analyzer.suggest_rebalancing(analysis_results, portfolio)
 
-    assert result["AAA"] == "Позиция отсутствует"
+    assert "AAA" not in result
+
