@@ -2,6 +2,8 @@ import asyncio
 import logging
 from typing import Dict, Tuple
 
+from config import settings
+
 from langgraph.graph import StateGraph, START, END
 from langsmith import traceable
 
@@ -21,8 +23,10 @@ logger = logging.getLogger(__name__)
 class AsyncPortfolioAnalyzer(PortfolioAnalyzer):
     """Асинхронная версия PortfolioAnalyzer с параллельной обработкой тикеров."""
 
-    def __init__(self, max_concurrent_tasks: int = 5):
+    def __init__(self, max_concurrent_tasks: int | None = None):
         super().__init__()
+        if max_concurrent_tasks is None:
+            max_concurrent_tasks = settings.max_concurrent_tasks
         self.semaphore = asyncio.Semaphore(max_concurrent_tasks)
 
     async def _analyze_single(
