@@ -32,37 +32,26 @@ class RebalancingAnalyzer:
             Словарь с рекомендациями по ребалансировке
         """
         rebalancing_suggestions: Dict[str, str] = {}
+        excluded_tickers: set[str] = set()
         cash = portfolio.cash_rub
-        total_positions = len(analysis_results)
-        
-        if total_positions == 0:
+
+        if not analysis_results:
             return rebalancing_suggestions
-        
-        # Подсчитываем рекомендации
-        recommendations_count = {
-            "КУПИТЬ": 0,
-            "ПРОДАВАТЬ": 0,
-            "ДЕРЖАТЬ": 0
-        }
-        
-        for result in analysis_results.values():
-            recommendations_count[result.recommendation] += 1
-        
-        # Генерируем предложения
+
         # Сначала продаем рекомендации "ПРОДАВАТЬ"
         for ticker, result in analysis_results.items():
             if result.recommendation != "ПРОДАВАТЬ":
                 continue
             position = portfolio.get_position(ticker)
             if not position or position.quantity <= 0:
-                rebalancing_suggestions[ticker] = "Позиция отсутствует"
+                excluded_tickers.add(ticker)
                 continue
             qty = position.quantity
             try:
                 price = self.price_getter(ticker)
             except Exception as e:
                 logger.error(f"Failed to get price for {ticker}: {e}")
-                rebalancing_suggestions[ticker] = "Цена недоступна"
+                excluded_tickers.add(ticker)
                 continue
 
             proceeds = price * qty * (1 - self.BROKER_FEE)
@@ -71,28 +60,54 @@ class RebalancingAnalyzer:
             rebalancing_suggestions[ticker] = f"Продать {qty}"
 
         # Затем покупаем согласно рекомендациям "КУПИТЬ"
-        buy_tickers = [t for t, r in analysis_results.items() if r.recommendation == "КУПИТЬ"]
-        buy_count = len(buy_tickers)
-        for ticker in buy_tickers:
+        buy_prices: Dict[str, float] = {}
+        for ticker, result in analysis_results.items():
+            if result.recommendation != "КУПИТЬ":
+                continue
             try:
-                price = self.price_getter(ticker)
+                buy_prices[ticker] = self.price_getter(ticker)
             except Exception as e:
                 logger.error(f"Failed to get price for {ticker}: {e}")
-                rebalancing_suggestions[ticker] = "Цена недоступна"
-                continue
+                excluded_tickers.add(ticker)
 
-            cash_per_ticker = cash / buy_count if buy_count else 0
-            qty = int(cash_per_ticker / (price * (1 + self.BROKER_FEE)))
-            if qty > 0:
+        buy_tickers = list(buy_prices.keys())
+        quantities: Dict[str, int] = {}
+
+        while buy_tickers:
+            min_price = min(buy_prices[t] * (1 + self.BROKER_FEE) for t in buy_tickers)
+            if cash < min_price:
+                break
+            cash_per_ticker = cash / len(buy_tickers)
+            to_remove = []
+            for ticker in buy_tickers:
+                price = buy_prices[ticker]
+                qty = int(cash_per_ticker / (price * (1 + self.BROKER_FEE)))
+                if qty > 0:
+                    cost = qty * price * (1 + self.BROKER_FEE)
+                    cash -= cost
+                    quantities[ticker] = quantities.get(ticker, 0) + qty
+                else:
+                    to_remove.append(ticker)
+            if not to_remove:
+                break
+            for ticker in to_remove:
+                buy_tickers.remove(ticker)
+                excluded_tickers.add(ticker)
+
+        for ticker, price in sorted(buy_prices.items(), key=lambda x: x[1]):
+            if ticker not in quantities:
+                continue
+            while cash >= price * (1 + self.BROKER_FEE):
+                qty = int(cash / (price * (1 + self.BROKER_FEE)))
                 cost = qty * price * (1 + self.BROKER_FEE)
                 cash -= cost
-                rebalancing_suggestions[ticker] = f"Купить {qty}"
-            else:
-                rebalancing_suggestions[ticker] = "Недостаточно средств"
+                quantities[ticker] += qty
 
-        # Для остальных "ДЕРЖАТЬ"
+        for ticker, qty in quantities.items():
+            rebalancing_suggestions[ticker] = f"Купить {qty}"
+
         for ticker, result in analysis_results.items():
-            if ticker not in rebalancing_suggestions:
+            if ticker not in rebalancing_suggestions and ticker not in excluded_tickers:
                 rebalancing_suggestions[ticker] = "Держать"
 
         rebalancing_suggestions["RUB"] = f"Остаток {int(round(cash))}"
