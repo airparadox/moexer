@@ -184,7 +184,8 @@ def print_analysis_results(results: dict):
         print(f"\n🏢 {ticker}")
         print(f"   Количество: {data['quantity']}")
         print(f"   Решение: {data['decision']}...")
-        print(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
+        rebalancing = results["rebalancing_suggestions"].get(ticker, "Нет данных")
+        print(f"   Ребалансировка: {rebalancing}")
         votes = data['details'].get('agent_votes', {})
         if votes:
             print("   Голоса агентов:")
@@ -264,7 +265,8 @@ def generate_analysis_report(results: dict) -> str:
         lines.append(f"\n🏢 {ticker}")
         lines.append(f"   Количество: {data['quantity']}")
         lines.append(f"   Решение: {data['decision']}...")
-        lines.append(f"   Ребалансировка: {results['rebalancing_suggestions'][ticker]}")
+        rebalancing = results["rebalancing_suggestions"].get(ticker, "Нет данных")
+        lines.append(f"   Ребалансировка: {rebalancing}")
         pmpt = data['details'].get('pmpt', {})
         if pmpt:
             lines.append(f"   Downside risk: {pmpt.get('downside_risk', float('nan')):.4f}")
@@ -344,7 +346,7 @@ def generate_html_report(results: dict) -> str:
             f"<td>{ticker}</td>" +
             f"<td>{data['quantity']}</td>" +
             f"<td>{data['decision']}</td>" +
-            f"<td>{results['rebalancing_suggestions'][ticker]}</td>" +
+            f"<td>{results['rebalancing_suggestions'].get(ticker, 'Нет данных')}</td>" +
             f"<td>{pmpt.get('downside_risk', float('nan')):.4f}</td>" +
             f"<td>{pmpt.get('sortino_ratio', float('nan')):.4f}</td>" +
             f"<td>{pmpt.get('omega_ratio', float('nan')):.4f}</td>" +
