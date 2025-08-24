@@ -22,10 +22,11 @@ class Settings(BaseSettings):
     moex_days_lookback: int = 180
     max_news_items: int = 3
     max_ifrs_content_length: int = 1500
-    
+
     # Лимиты API
     api_timeout: int = 30
     max_retries: int = 3
+    max_concurrent_tasks: int = 20
     
 
 settings = Settings()
