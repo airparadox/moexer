@@ -14,6 +14,7 @@ from utils import (
     calculate_portfolio_value,
     get_performance_report,
     performance_monitor,
+    APIError,
 )
 from services import RecommendationDB, MOEXService
 from datetime import datetime
@@ -215,7 +216,11 @@ def save_recommendations_to_db(results: dict) -> None:
     moex = MOEXService()
     now = datetime.now()
     for ticker, data in results.get("analysis_results", {}).items():
-        price = moex.get_latest_price(ticker)
+        try:
+            price = moex.get_latest_price(ticker)
+        except APIError as e:
+            logger.error(f"Skipping {ticker}: {e}")
+            continue
         record = RecommendationRecord(
             ticker=ticker,
             recommendation=data["recommendation"],

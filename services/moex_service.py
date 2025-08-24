@@ -76,7 +76,12 @@ class MOEXService:
                 divs = divs.rename(columns={'dDate': 'TRADEDATE'})
                 divs['IS_DIVIDEND_DAY'] = True
                 df = df.merge(divs, on='TRADEDATE', how='left')
-                df['IS_DIVIDEND_DAY'] = df['IS_DIVIDEND_DAY'].fillna(False)
+                df['IS_DIVIDEND_DAY'] = (
+                    df['IS_DIVIDEND_DAY']
+                    .astype('boolean')
+                    .fillna(False)
+                    .astype(bool)
+                )
 
                 return df
                 
