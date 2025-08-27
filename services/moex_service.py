@@ -118,6 +118,31 @@ class MOEXService:
             logger.error(f"Failed to get latest price for {ticker}: {e}")
             raise APIError(f"Failed to get latest price for {ticker}: {e}")
 
+    @retry_on_failure(max_retries=settings.max_retries)
+    def get_latest_prices(self, tickers: list[str]) -> pd.DataFrame:
+        """Возвращает последние цены закрытия для списка тикеров."""
+        try:
+            url = (
+                "https://iss.moex.com/iss/engines/stock/markets/shares/securities.json"
+            )
+            params = {"securities": ",".join(tickers)}
+            with requests.Session() as session:
+                resp = session.get(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+            sec = data.get("securities", {})
+            if not sec:
+                raise ValueError("No data returned")
+            df = pd.DataFrame(sec["data"], columns=sec["columns"])
+            df = df[["SECID", "PREVCLOSE"]].rename(
+                columns={"SECID": "ticker", "PREVCLOSE": "price"}
+            )
+            df["ticker"] = df["ticker"].str.upper()
+            return df.set_index("ticker")
+        except Exception as e:
+            logger.error(f"Failed to get prices for {tickers}: {e}")
+            raise APIError(f"Failed to get prices for {tickers}: {e}")
+
     def get_returns(self, ticker: str, days_back: Optional[int] = None) -> list[float]:
         """Возвращает ряд доходностей по закрытиям."""
         try:
