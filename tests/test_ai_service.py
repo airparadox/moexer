@@ -21,6 +21,13 @@ class TestAIService:
         monkeypatch.setattr(settings, 'llm_provider', 'ollama')
         return AIService()
 
+    @pytest.fixture
+    def openai_service(self, monkeypatch):
+        monkeypatch.delenv('DEEPSEEK_API_KEY', raising=False)
+        monkeypatch.setenv('OPENAI_API_KEY', 'test_key')
+        monkeypatch.setattr(settings, 'llm_provider', 'openai')
+        return AIService()
+
     @patch('services.ai_service.OpenAI')
     def test_call_model_deepseek_success(self, mock_openai, deepseek_service):
         """Тест успешного вызова DeepSeek API"""
@@ -98,3 +105,37 @@ class TestAIService:
         result = ollama_service.call_model("system", "user")
         assert result == 'Hi'
         mock_client.return_value.chat.assert_called_once()
+
+    @patch('services.ai_service.OpenAI')
+    def test_call_model_openai_success(self, mock_openai, openai_service):
+        """Тест успешного вызова OpenAI API"""
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = "OpenAI response"
+        mock_openai.return_value.chat.completions.create.return_value = mock_response
+
+        result = openai_service.call_model("system", "user")
+        assert result == "OpenAI response"
+
+        mock_openai.return_value.chat.completions.create.assert_called_once()
+        call_args = mock_openai.return_value.chat.completions.create.call_args
+        assert call_args[1]['model'] == 'gpt-4o-mini'
+
+    @patch('services.ai_service.OpenAI')
+    def test_call_model_openai_api_error(self, mock_openai, openai_service):
+        """Тест обработки ошибок OpenAI API"""
+        mock_openai.return_value.chat.completions.create.side_effect = Exception("API Error")
+
+        with patch('time.sleep'):
+            with pytest.raises(APIError):
+                openai_service.call_model("system", "user")
+        assert (
+            mock_openai.return_value.chat.completions.create.call_count
+            == settings.max_retries
+        )
+
+    def test_openai_init_without_api_key(self, monkeypatch):
+        monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+        monkeypatch.setattr(settings, 'llm_provider', 'openai')
+        with pytest.raises(ValueError, match="OPENAI_API_KEY must be set"):
+            AIService()

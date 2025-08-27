@@ -12,15 +12,23 @@ from utils.monitoring import monitor_performance
 logger = logging.getLogger(__name__)
 
 class AIService:
-    """Сервис для работы с LLM провайдерами (DeepSeek или локальная Ollama)"""
+    """Сервис для работы с LLM провайдерами (DeepSeek, OpenAI или локальная Ollama)"""
 
     def __init__(self, api_key: Optional[str] = None):
         self.provider = settings.llm_provider.lower()
+        if self.provider == "chatgpt":
+            self.provider = "openai"
+
         if self.provider == "deepseek":
             env_key = os.getenv("DEEPSEEK_API_KEY")
             self.api_key = api_key or env_key
             if not self.api_key:
                 raise ValueError("DEEPSEEK_API_KEY must be set")
+        elif self.provider == "openai":
+            env_key = os.getenv("OPENAI_API_KEY")
+            self.api_key = api_key or env_key
+            if not self.api_key:
+                raise ValueError("OPENAI_API_KEY must be set")
         else:
             self.api_key = None
         self.client: Optional[Any] = None
@@ -32,6 +40,14 @@ class AIService:
                     api_key=self.api_key,
                     base_url=settings.deepseek_base_url,
                 )
+                if os.getenv("LANGCHAIN_API_KEY") or os.getenv("LANGSMITH_API_KEY"):
+                    client = wrap_openai(client)
+                self.client = client
+            elif self.provider == "openai":
+                kwargs = {"api_key": self.api_key}
+                if settings.openai_base_url:
+                    kwargs["base_url"] = settings.openai_base_url
+                client = OpenAI(**kwargs)
                 if os.getenv("LANGCHAIN_API_KEY") or os.getenv("LANGSMITH_API_KEY"):
                     client = wrap_openai(client)
                 self.client = client
@@ -49,6 +65,17 @@ class AIService:
             if self.provider == "deepseek":
                 response = self.client.chat.completions.create(
                     model=settings.deepseek_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=1,
+                    stream=False,
+                )
+                return response.choices[0].message.content
+            elif self.provider == "openai":
+                response = self.client.chat.completions.create(
+                    model=settings.openai_model,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},

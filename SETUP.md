@@ -13,7 +13,7 @@ portfolio_analyzer/
 │   └── state.py           # Portfolio, AnalysisResult
 ├── services/              # Сервисный слой
 │   ├── __init__.py
-│   ├── ai_service.py      # LLM API (DeepSeek/Ollama)
+│   ├── ai_service.py      # LLM API (DeepSeek/OpenAI/Ollama)
 │   ├── news_service.py    # Новости (Lenta.ru, Tinkoff Pulse)
 │   ├── moex_service.py    # Данные MOEX
 │   └── ifrs_service.py    # IFRS отчетность
@@ -57,12 +57,17 @@ cp .env.example .env
 Отредактируйте `.env`:
 ```env
 # LLM provider configuration
-LLM_PROVIDER=deepseek              # или 'ollama'
+LLM_PROVIDER=deepseek              # или 'ollama' или 'openai'
 
 # DeepSeek API Configuration
 DEEPSEEK_API_KEY=your_actual_api_key_here
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_BASE_URL=https://api.deepseek.com
+
+# OpenAI API Configuration
+OPENAI_API_KEY=your_openai_key
+OPENAI_MODEL=gpt-4o-mini
+# OPENAI_BASE_URL=https://api.openai.com/v1
 
 # Local Ollama configuration
 OLLAMA_MODEL=llama3:8b
