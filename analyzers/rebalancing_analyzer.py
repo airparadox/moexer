@@ -98,7 +98,7 @@ class RebalancingAnalyzer:
         missing_buy_prices = set(buy_tickers) - set(buy_df.index)
         excluded_tickers.update(missing_buy_prices)
 
-        if not buy_df.empty and cash > 0:
+        if not buy_df.empty:
             adjusted_prices = buy_df["price"] * (1 + self.BROKER_FEE)
             base_quantities = (cash / len(buy_df) / adjusted_prices).astype(int)
             spent = (base_quantities * adjusted_prices).sum()
@@ -115,7 +115,7 @@ class RebalancingAnalyzer:
             quantities = (base_quantities + additional).astype(int)
             cash = cash_remaining
 
-            for ticker, qty in quantities[quantities > 0].items():
+            for ticker, qty in quantities.items():
                 rebalancing_suggestions[ticker] = f"Купить {int(qty)}"
 
         for ticker, result in analysis_results.items():
