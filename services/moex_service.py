@@ -153,6 +153,8 @@ class MOEXService:
                 raise KeyError("No known price column found")
 
             df["ticker"] = df["ticker"].str.upper()
+            # Ensure unique tickers to avoid reindex errors downstream
+            df = df.drop_duplicates(subset="ticker", keep="first")
             return df.set_index("ticker")
         except Exception as e:
             logger.error(f"Failed to get prices for {tickers}: {e}")
@@ -162,7 +164,8 @@ class MOEXService:
         """Возвращает ряд доходностей по закрытиям."""
         try:
             df = self.get_ticker_data(ticker, days_back=days_back)
-            returns = df['CLOSE'].pct_change().dropna().tolist()
+            # Explicitly disable filling to avoid future pandas warnings
+            returns = df['CLOSE'].pct_change(fill_method=None).dropna().tolist()
             return [float(r) for r in returns]
         except Exception as e:
             logger.error(f"Failed to get returns for {ticker}: {e}")
