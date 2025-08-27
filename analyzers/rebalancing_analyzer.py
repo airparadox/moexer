@@ -1,6 +1,9 @@
 import logging
-from typing import Dict, Callable
+from typing import Callable, Dict, List
+
+import pandas as pd
 from langsmith import traceable
+
 from models.state import AnalysisResult, Portfolio, RiskProfile
 from services.moex_service import MOEXService
 
@@ -12,8 +15,14 @@ class RebalancingAnalyzer:
     BROKER_FEE = 0.0006  # 0.06%
     TAX_RATE = 0.15  # 15%
 
-    def __init__(self, price_getter: Callable[[str], float] | None = None):
-        self.price_getter = price_getter or MOEXService().get_latest_price
+    def __init__(self, price_getter: Callable[[List[str]], pd.DataFrame] | None = None):
+        """Initialize analyzer.
+
+        Args:
+            price_getter: Callable that accepts list of tickers and returns
+                DataFrame with index as tickers and column ``price``.
+        """
+        self.price_getter = price_getter or MOEXService().get_latest_prices
 
     @traceable
     def suggest_rebalancing(
@@ -38,73 +47,76 @@ class RebalancingAnalyzer:
         if not analysis_results:
             return rebalancing_suggestions
 
-        # Сначала продаем рекомендации "ПРОДАВАТЬ"
-        for ticker, result in analysis_results.items():
-            if result.recommendation != "ПРОДАВАТЬ":
-                continue
-            position = portfolio.get_position(ticker)
-            if not position or position.quantity <= 0:
-                excluded_tickers.add(ticker)
-                continue
-            qty = position.quantity
-            try:
-                price = self.price_getter(ticker)
-            except Exception as e:
-                logger.error(f"Failed to get price for {ticker}: {e}")
-                excluded_tickers.add(ticker)
-                continue
+        tickers = list(analysis_results.keys())
+        try:
+            prices_df = self.price_getter(tickers)
+        except Exception as e:
+            logger.error(f"Failed to get prices: {e}")
+            return rebalancing_suggestions
 
-            proceeds = price * qty * (1 - self.BROKER_FEE)
-            proceeds_after_tax = proceeds * (1 - self.TAX_RATE)
-            cash += proceeds_after_tax
-            rebalancing_suggestions[ticker] = f"Продать {qty}"
+        prices_df = prices_df.copy()
+        if "price" not in prices_df.columns:
+            raise ValueError("Price DataFrame must contain 'price' column")
 
-        # Затем покупаем согласно рекомендациям "КУПИТЬ"
-        buy_prices: Dict[str, float] = {}
-        for ticker, result in analysis_results.items():
-            if result.recommendation != "КУПИТЬ":
-                continue
-            try:
-                buy_prices[ticker] = self.price_getter(ticker)
-            except Exception as e:
-                logger.error(f"Failed to get price for {ticker}: {e}")
-                excluded_tickers.add(ticker)
+        positions_df = pd.DataFrame(
+            [(p.ticker, p.quantity) for p in portfolio.positions],
+            columns=["ticker", "quantity"],
+        ).set_index("ticker")
 
-        buy_tickers = list(buy_prices.keys())
-        quantities: Dict[str, int] = {}
+        # ----- Sell recommendations -----
+        sell_tickers = [
+            t for t, r in analysis_results.items() if r.recommendation == "ПРОДАВАТЬ"
+        ]
+        sell_df = positions_df.reindex(sell_tickers)
+        missing_positions = sell_df[sell_df["quantity"].isna()].index
+        excluded_tickers.update(missing_positions)
+        sell_df = sell_df.dropna()
+        zero_qty = sell_df[sell_df["quantity"] <= 0].index
+        excluded_tickers.update(zero_qty)
+        sell_df = sell_df[sell_df["quantity"] > 0]
+        sell_df = sell_df.join(prices_df[["price"]], how="left")
+        missing_sell_prices = sell_df[sell_df["price"].isna()].index
+        excluded_tickers.update(missing_sell_prices)
+        sell_df = sell_df.dropna(subset=["price"])
 
-        while buy_tickers:
-            min_price = min(buy_prices[t] * (1 + self.BROKER_FEE) for t in buy_tickers)
-            if cash < min_price:
-                break
-            cash_per_ticker = cash / len(buy_tickers)
-            to_remove = []
-            for ticker in buy_tickers:
-                price = buy_prices[ticker]
-                qty = int(cash_per_ticker / (price * (1 + self.BROKER_FEE)))
-                if qty > 0:
-                    cost = qty * price * (1 + self.BROKER_FEE)
-                    cash -= cost
-                    quantities[ticker] = quantities.get(ticker, 0) + qty
-                else:
-                    to_remove.append(ticker)
-            if not to_remove:
-                break
-            for ticker in to_remove:
-                buy_tickers.remove(ticker)
-                excluded_tickers.add(ticker)
+        if not sell_df.empty:
+            proceeds = (
+                sell_df["price"]
+                * sell_df["quantity"]
+                * (1 - self.BROKER_FEE)
+                * (1 - self.TAX_RATE)
+            )
+            cash += proceeds.sum()
+            for ticker, qty in sell_df["quantity"].items():
+                rebalancing_suggestions[ticker] = f"Продать {int(qty)}"
 
-        for ticker, price in sorted(buy_prices.items(), key=lambda x: x[1]):
-            if ticker not in quantities:
-                continue
-            while cash >= price * (1 + self.BROKER_FEE):
-                qty = int(cash / (price * (1 + self.BROKER_FEE)))
-                cost = qty * price * (1 + self.BROKER_FEE)
-                cash -= cost
-                quantities[ticker] += qty
+        # ----- Buy recommendations -----
+        buy_tickers = [
+            t for t, r in analysis_results.items() if r.recommendation == "КУПИТЬ"
+        ]
+        buy_df = prices_df.reindex(buy_tickers).dropna(subset=["price"])
+        missing_buy_prices = set(buy_tickers) - set(buy_df.index)
+        excluded_tickers.update(missing_buy_prices)
 
-        for ticker, qty in quantities.items():
-            rebalancing_suggestions[ticker] = f"Купить {qty}"
+        if not buy_df.empty and cash > 0:
+            adjusted_prices = buy_df["price"] * (1 + self.BROKER_FEE)
+            base_quantities = (cash / len(buy_df) / adjusted_prices).astype(int)
+            spent = (base_quantities * adjusted_prices).sum()
+            cash_remaining = cash - spent
+
+            additional = pd.Series(0, index=buy_df.index, dtype=int)
+            for ticker, price in adjusted_prices.sort_values().items():
+                if cash_remaining < price:
+                    break
+                qty = int(cash_remaining / price)
+                additional[ticker] = qty
+                cash_remaining -= qty * price
+
+            quantities = (base_quantities + additional).astype(int)
+            cash = cash_remaining
+
+            for ticker, qty in quantities[quantities > 0].items():
+                rebalancing_suggestions[ticker] = f"Купить {int(qty)}"
 
         for ticker, result in analysis_results.items():
             if ticker not in rebalancing_suggestions and ticker not in excluded_tickers:
