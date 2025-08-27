@@ -18,15 +18,23 @@ from utils.helpers import (
     extract_recommendation,
 )
 from utils.pmpt import pmpt_metrics
+from config import get_modules_config
 
 logger = logging.getLogger(__name__)
 
-# Веса источников данных для финального анализа
-WEIGHTS = {
-    "ifrs": 0.55,            # МСФО-отчётность, фундаментал
-    "market_news": 0.20,     # Новости от информагентств
-    "moex": 0.15,            # Биржевые данные (объёмы, ликвидность)
-    "social": 0.10,          # Соцсети
+
+MODULE_NAMES_SYSTEM = {
+    "ifrs": "МСФО и фундаментал",
+    "market_news": "Новости агентств",
+    "moex": "Биржевые данные",
+    "social": "Соцсети",
+}
+
+MODULE_NAMES_USER = {
+    "ifrs": "Финансы",
+    "market_news": "Новости от информагентств",
+    "moex": "Биржевые данные",
+    "social": "Соцсети",
 }
 
 class PortfolioAnalyzer:
@@ -38,10 +46,14 @@ class PortfolioAnalyzer:
         self.news_service = NewsService()
         self.moex_service = MOEXService()
         self.ifrs_service = IFRSService()
+        self.modules_config = get_modules_config()
+        self.weights = {k: v["weight"] for k, v in self.modules_config.items()}
     
     @traceable
     def generate_market_news(self, state: State) -> dict:
         """Получение и анализ новостей с lenta.ru"""
+        if not self.modules_config.get("market_news", {}).get("enabled", True):
+            return {"market_news": "Модуль market_news отключен"}
         try:
             news_entries = self.news_service.get_market_news()
 
@@ -64,6 +76,8 @@ class PortfolioAnalyzer:
     @traceable
     def generate_news(self, state: State) -> dict:
         """Получение новостей по тикеру"""
+        if not self.modules_config.get("social", {}).get("enabled", True):
+            return {"news": []}
         try:
             texts = self.news_service.get_ticker_news(state['ticker'])
             return {"news": texts}
@@ -77,6 +91,8 @@ class PortfolioAnalyzer:
     @traceable
     def grade_news(self, state: State) -> dict:
         """Анализ новостей компании"""
+        if not self.modules_config.get("social", {}).get("enabled", True):
+            return {"semantic": "Модуль social отключен"}
         try:
             if not state['news']:
                 return {"semantic": "Нет новостей для анализа"}
@@ -97,6 +113,8 @@ class PortfolioAnalyzer:
     @traceable
     def moex_news(self, state: State) -> dict:
         """Получение данных MOEX"""
+        if not self.modules_config.get("moex", {}).get("enabled", True):
+            return {"moex_data": "Модуль moex отключен"}
         try:
             df = self.moex_service.get_ticker_data(state['ticker'])
             return {"moex_data": df.to_string(index=False)}
@@ -110,6 +128,8 @@ class PortfolioAnalyzer:
     @traceable
     def make_trade_analysis(self, state: State) -> dict:
         """Технический анализ торговых данных"""
+        if not self.modules_config.get("moex", {}).get("enabled", True):
+            return {"moex_data_analysis": "Модуль moex отключен"}
         try:
             if state['moex_data'] == "Ошибка получения данных MOEX":
                 return {"moex_data_analysis": "Невозможно провести технический анализ"}
@@ -137,6 +157,8 @@ class PortfolioAnalyzer:
     @traceable
     def ifrs_analysis(self, state: State) -> dict:
         """Анализ IFRS отчетности"""
+        if not self.modules_config.get("ifrs", {}).get("enabled", True):
+            return {"ifrs_data": "Модуль ifrs отключен"}
         try:
             ifrs_content = self.ifrs_service.get_ifrs_data(state['ticker'])
 
@@ -180,6 +202,11 @@ class PortfolioAnalyzer:
             ifrs_data = truncate_text(state.get('ifrs_data', ''), 3000)
 
             # 3) Формируем подсказки
+            weight_lines = "".join(
+                f"- {MODULE_NAMES_SYSTEM.get(name, name)} — {cfg['weight']*100:.0f}%\n"
+                for name, cfg in self.modules_config.items()
+                if cfg.get("enabled")
+            )
             system_prompt = (
                 "Ты — инвестиционный директор хедж-фонда."
                 " Твоя задача: на основе данных о компании и рыночной ситуации подготовить финальную рекомендацию в формате:\n"
@@ -187,10 +214,7 @@ class PortfolioAnalyzer:
                 "- Краткое объяснение на 2–3 предложения для управляющего портфелем\n\n"
                 "Правила:\n"
                 "1. Всегда учитывай весовые коэффициенты источников данных:\n"
-                f"- МСФО и фундаментал — {WEIGHTS['ifrs']*100:.0f}%\n"
-                f"- Новости агентств — {WEIGHTS['market_news']*100:.0f}%\n"
-                f"- Биржевые данные — {WEIGHTS['moex']*100:.0f}%\n"
-                f"- Соцсети — {WEIGHTS['social']*100:.0f}%\n"
+                f"{weight_lines}"
                 "2. Если позиция ещё не открыта → рекомендация: КУПИТЬ / ДЕРЖАТЬ / ПРОДАВАТЬ (где ДЕРЖАТЬ означает «воздержаться от покупки»).\n"
                 "3. Если позиция уже есть → рекомендация: УВЕЛИЧИТЬ / СОКРАТИТЬ / ДЕРЖАТЬ.\n"
                 f"4. Учитывай профиль инвестора: {risk}. {goal_map.get(risk, '')}\n"
@@ -198,13 +222,28 @@ class PortfolioAnalyzer:
                 "Стиль ответа: как на заседании инвестиционного комитета хедж-фонда."
             )
 
+            user_lines = []
+            if self.modules_config.get("ifrs", {}).get("enabled"):
+                user_lines.append(
+                    f"- {MODULE_NAMES_USER['ifrs']} (вес {self.weights['ifrs']*100:.0f}%): {ifrs_data}"
+                )
+            if self.modules_config.get("market_news", {}).get("enabled"):
+                user_lines.append(
+                    f"- {MODULE_NAMES_USER['market_news']} (вес {self.weights['market_news']*100:.0f}%): {market_news}"
+                )
+            if self.modules_config.get("moex", {}).get("enabled"):
+                user_lines.append(
+                    f"- {MODULE_NAMES_USER['moex']} (вес {self.weights['moex']*100:.0f}%): {moex_analysis}"
+                )
+            if self.modules_config.get("social", {}).get("enabled"):
+                user_lines.append(
+                    f"- {MODULE_NAMES_USER['social']} (вес {self.weights['social']*100:.0f}%): {semantic}"
+                )
+
             user_prompt = (
                 f"Сводка по {state['ticker']}:\n"
-                f"- Финансы (вес {WEIGHTS['ifrs']*100:.0f}%): {ifrs_data}\n"
-                f"- Новости от информагентств (вес {WEIGHTS['market_news']*100:.0f}%): {market_news}\n"
-                f"- Биржевые данные (вес {WEIGHTS['moex']*100:.0f}%): {moex_analysis}\n"
-                f"- Соцсети (вес {WEIGHTS['social']*100:.0f}%): {semantic}\n"
-                f"Тип инвестора: {risk}. {goal_map.get(risk, '')}"
+                + "\n".join(user_lines)
+                + f"\nТип инвестора: {risk}. {goal_map.get(risk, '')}"
             )
 
             analysis = self.ai_service.call_model(system_prompt, user_prompt) or "Нет ответа модели"

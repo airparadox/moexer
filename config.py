@@ -1,4 +1,8 @@
 import os
+import csv
+from functools import lru_cache
+from typing import Dict
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +34,36 @@ class Settings(BaseSettings):
     api_timeout: int = 30
     max_retries: int = 3
     max_concurrent_tasks: int = 20
+
+    # Конфигурация модулей анализа
+    module_config_file: str = os.getenv("MODULE_CONFIG_FILE", "modules.csv")
     
 
 settings = Settings()
+
+
+def load_module_config(path: str) -> Dict[str, Dict[str, float | bool]]:
+    """Load module configuration from CSV file."""
+    modules: Dict[str, Dict[str, float | bool]] = {}
+    try:
+        with open(path, newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if not row or row[0].startswith("#"):
+                    continue
+                name, enabled, weight = row[0].strip(), row[1].strip(), row[2].strip()
+                modules[name] = {"enabled": enabled == "1", "weight": float(weight)}
+    except FileNotFoundError:
+        modules = {
+            "ifrs": {"enabled": True, "weight": 0.55},
+            "market_news": {"enabled": True, "weight": 0.20},
+            "moex": {"enabled": True, "weight": 0.15},
+            "social": {"enabled": True, "weight": 0.10},
+        }
+    return modules
+
+
+@lru_cache(maxsize=1)
+def get_modules_config() -> Dict[str, Dict[str, float | bool]]:
+    """Cached accessor for module configuration."""
+    return load_module_config(settings.module_config_file)
