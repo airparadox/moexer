@@ -24,11 +24,13 @@ def retry_on_failure(max_retries: int = 3, delay: float = 1.0):
             for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
-                except (requests.RequestException, ConnectionError) as e:
+                except (requests.RequestException, ConnectionError, APIError) as e:
                     if attempt == max_retries - 1:
                         logger.error(f"Failed after {max_retries} attempts: {e}")
-                        raise APIError(f"API call failed after {max_retries} attempts: {e}")
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                        raise APIError(f"API call failed after {max_retries} attempts: {e}") from e
+                    logger.warning(
+                        f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s..."
+                    )
                     time.sleep(delay)
                 except Exception as e:
                     logger.error(f"Unexpected error in {func.__name__}: {e}")

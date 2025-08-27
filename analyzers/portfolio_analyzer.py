@@ -44,17 +44,20 @@ class PortfolioAnalyzer:
         """Получение и анализ новостей с lenta.ru"""
         try:
             news_entries = self.news_service.get_market_news()
-            
+
             if news_entries:
                 system_prompt = "Анализ новостей рынка. Формат: Настрой, Факторы, Влияние"
                 user_prompt = f"Новости:\n{news_entries}"
-                
+
                 analysis = self.ai_service.call_model(system_prompt, user_prompt)
                 return {"market_news": analysis}
-            
+
             return {"market_news": "Недостаточно свежих новостей для анализа"}
-            
-        except (APIError, Exception) as e:
+
+        except APIError as e:
+            logger.error(f"Market news API error: {e}")
+            return {"market_news": "Ошибка при анализе новостей"}
+        except Exception as e:
             logger.error(f"Market news error: {e}")
             return {"market_news": "Ошибка при анализе новостей"}
 
@@ -64,7 +67,10 @@ class PortfolioAnalyzer:
         try:
             texts = self.news_service.get_ticker_news(state['ticker'])
             return {"news": texts}
-        except (APIError, Exception) as e:
+        except APIError as e:
+            logger.error(f"News API error {state['ticker']}: {e}")
+            return {"news": []}
+        except Exception as e:
             logger.error(f"News error {state['ticker']}: {e}")
             return {"news": []}
 
@@ -74,14 +80,17 @@ class PortfolioAnalyzer:
         try:
             if not state['news']:
                 return {"semantic": "Нет новостей для анализа"}
-            
+
             system_prompt = "Анализ новостей компании. Формат: Настрой, Ключевое, Риски"
             user_prompt = f"Новости {state['ticker']}:\n{state['news']}"
-            
+
             analysis = self.ai_service.call_model(system_prompt, user_prompt)
             return {"semantic": analysis}
-            
-        except (APIError, Exception) as e:
+
+        except APIError as e:
+            logger.error(f"Grade API error {state['ticker']}: {e}")
+            return {"semantic": "Ошибка анализа новостей"}
+        except Exception as e:
             logger.error(f"Grade error {state['ticker']}: {e}")
             return {"semantic": "Ошибка анализа новостей"}
 
@@ -91,7 +100,10 @@ class PortfolioAnalyzer:
         try:
             df = self.moex_service.get_ticker_data(state['ticker'])
             return {"moex_data": df.to_string(index=False)}
-        except (APIError, Exception) as e:
+        except APIError as e:
+            logger.error(f"MOEX API error {state['ticker']}: {e}")
+            return {"moex_data": "Ошибка получения данных MOEX"}
+        except Exception as e:
             logger.error(f"MOEX error {state['ticker']}: {e}")
             return {"moex_data": "Ошибка получения данных MOEX"}
 
@@ -101,21 +113,24 @@ class PortfolioAnalyzer:
         try:
             if state['moex_data'] == "Ошибка получения данных MOEX":
                 return {"moex_data_analysis": "Невозможно провести технический анализ"}
-            
+
             system_prompt = (
                 "Теханализ. Формат: Тренд, Объемы, Волатильность."
                 " Учитывай колонку IS_DIVIDEND_DAY: резкие падения в эти даты"
                 " могут быть связаны с дивидендной отсечкой"
             )
-            
+
             # Используем сервис для получения последних 180 дней
             recent_data = self.moex_service.get_recent_data(state['ticker'], 180)
             user_prompt = f"Данные {state['ticker']}:\n{recent_data}"
-            
+
             analysis = self.ai_service.call_model(system_prompt, user_prompt)
             return {"moex_data_analysis": analysis}
-            
-        except (APIError, Exception) as e:
+
+        except APIError as e:
+            logger.error(f"Trade analysis API error {state['ticker']}: {e}")
+            return {"moex_data_analysis": "Ошибка технического анализа"}
+        except Exception as e:
             logger.error(f"Trade analysis error {state['ticker']}: {e}")
             return {"moex_data_analysis": "Ошибка технического анализа"}
 
@@ -124,17 +139,23 @@ class PortfolioAnalyzer:
         """Анализ IFRS отчетности"""
         try:
             ifrs_content = self.ifrs_service.get_ifrs_data(state['ticker'])
-            
+
             if "не найдена" in ifrs_content:
                 return {"ifrs_data": ifrs_content}
-            
+
             system_prompt = "Анализ МСФО. Формат: Финансы, Рентабельность, Долги"
             user_prompt = f"Отчетность {state['ticker']}:\n{ifrs_content}"
-            
+
             analysis = self.ai_service.call_model(system_prompt, user_prompt)
             return {"ifrs_data": analysis}
-            
-        except (APIError, DataProcessingError, Exception) as e:
+
+        except APIError as e:
+            logger.error(f"IFRS API error {state['ticker']}: {e}")
+            return {"ifrs_data": "Ошибка анализа МСФО"}
+        except DataProcessingError as e:
+            logger.error(f"IFRS data error {state['ticker']}: {e}")
+            return {"ifrs_data": "Ошибка анализа МСФО"}
+        except Exception as e:
             logger.error(f"IFRS error {state['ticker']}: {e}")
             return {"ifrs_data": "Ошибка анализа МСФО"}
 
@@ -209,7 +230,10 @@ class PortfolioAnalyzer:
                 "agent_confidences": confidences,
             }
 
-        except (APIError, Exception) as e:
+        except APIError as e:
+            logger.error(f"Final analysis API error {state['ticker']}: {e}")
+            return {"final_data": "Ошибка финального анализа"}
+        except Exception as e:
             logger.error(f"Final analysis error {state['ticker']}: {e}")
             return {"final_data": "Ошибка финального анализа"}
 

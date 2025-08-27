@@ -44,8 +44,8 @@ class AIService:
     @retry_on_failure(max_retries=settings.max_retries)
     def call_model(self, system_prompt: str, user_prompt: str) -> str:
         """Унифицированный вызов LLM"""
+        self._ensure_client()
         try:
-            self._ensure_client()
             if self.provider == "deepseek":
                 response = self.client.chat.completions.create(
                     model=settings.deepseek_model,
@@ -66,6 +66,8 @@ class AIService:
                     ],
                 )
                 return response["message"]["content"]
+            else:
+                raise ValueError(f"Unsupported provider: {self.provider}")
         except Exception as e:
             logger.error(f"{self.provider.capitalize()} API error: {e}")
-            return "Ошибка анализа"
+            raise APIError(f"{self.provider.capitalize()} API error: {e}") from e
