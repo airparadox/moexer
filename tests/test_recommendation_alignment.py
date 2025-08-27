@@ -39,3 +39,18 @@ def test_final_decision_aligns_with_rebalancing():
 
     assert suggestions["AAA"].startswith("Купить")
 
+
+def test_buy_recommendation_with_no_cash_shows_zero_quantity():
+    portfolio = Portfolio.from_dict({"AAA": 0, "RUB": 0})
+    results = {
+        "AAA": AnalysisResult(
+            ticker="AAA", recommendation="КУПИТЬ", confidence=1.0, analysis_data={}
+        )
+    }
+
+    price_df = pd.DataFrame({"price": [100.0]}, index=["AAA"])
+    rebalancer = RebalancingAnalyzer(price_getter=lambda ts: price_df.loc[ts])
+    suggestions = rebalancer.suggest_rebalancing(results, portfolio)
+
+    assert suggestions["AAA"] == "Купить 0"
+
