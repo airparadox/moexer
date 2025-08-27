@@ -1,7 +1,6 @@
 from typing_extensions import TypedDict
 from pydantic import BaseModel, validator
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
 from enum import Enum
 
 
