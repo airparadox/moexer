@@ -86,7 +86,8 @@ LOG_LEVEL=INFO
 
 ### Основной анализ портфеля
 ```python
-from main import analyze_portfolio_improved
+from analysis import analyze_portfolio_improved
+from reports import print_analysis_results
 
 # Определяем портфель
 portfolio = {

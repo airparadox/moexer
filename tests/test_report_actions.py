@@ -1,5 +1,5 @@
 import pytest
-from main import generate_analysis_report
+from reports import generate_analysis_report
 
 
 def test_actions_table_in_report():
