@@ -48,12 +48,15 @@ class PortfolioAnalyzer:
         self.ifrs_service = IFRSService()
         self.modules_config = get_modules_config()
         self.weights = {k: v["weight"] for k, v in self.modules_config.items()}
+        self._market_news_cache: Optional[str] = None
     
     @traceable
     def generate_market_news(self, state: State) -> dict:
         """Получение и анализ новостей с lenta.ru"""
         if not self.modules_config.get("market_news", {}).get("enabled", True):
             return {"market_news": "Модуль market_news отключен"}
+        if self._market_news_cache is not None:
+            return {"market_news": self._market_news_cache}
         try:
             news_entries = self.news_service.get_market_news()
 
@@ -62,16 +65,23 @@ class PortfolioAnalyzer:
                 user_prompt = f"Новости:\n{news_entries}"
 
                 analysis = self.ai_service.call_model(system_prompt, user_prompt)
+                self._market_news_cache = analysis
                 return {"market_news": analysis}
 
-            return {"market_news": "Недостаточно свежих новостей для анализа"}
+            msg = "Недостаточно свежих новостей для анализа"
+            self._market_news_cache = msg
+            return {"market_news": msg}
 
         except APIError as e:
             logger.error(f"Market news API error: {e}")
-            return {"market_news": "Ошибка при анализе новостей"}
+            msg = "Ошибка при анализе новостей"
+            self._market_news_cache = msg
+            return {"market_news": msg}
         except Exception as e:
             logger.error(f"Market news error: {e}")
-            return {"market_news": "Ошибка при анализе новостей"}
+            msg = "Ошибка при анализе новостей"
+            self._market_news_cache = msg
+            return {"market_news": msg}
 
     @traceable
     def generate_news(self, state: State) -> dict:
@@ -92,23 +102,23 @@ class PortfolioAnalyzer:
     def grade_news(self, state: State) -> dict:
         """Анализ новостей компании"""
         if not self.modules_config.get("social", {}).get("enabled", True):
-            return {"semantic": "Модуль social отключен"}
+            return {"semantic": "Модуль social отключен", "news": ""}
         try:
             if not state['news']:
-                return {"semantic": "Нет новостей для анализа"}
+                return {"semantic": "Нет новостей для анализа", "news": ""}
 
             system_prompt = "Анализ новостей компании. Формат: Настрой, Ключевое, Риски"
             user_prompt = f"Новости {state['ticker']}:\n{state['news']}"
 
             analysis = self.ai_service.call_model(system_prompt, user_prompt)
-            return {"semantic": analysis}
+            return {"semantic": analysis, "news": ""}
 
         except APIError as e:
             logger.error(f"Grade API error {state['ticker']}: {e}")
-            return {"semantic": "Ошибка анализа новостей"}
+            return {"semantic": "Ошибка анализа новостей", "news": ""}
         except Exception as e:
             logger.error(f"Grade error {state['ticker']}: {e}")
-            return {"semantic": "Ошибка анализа новостей"}
+            return {"semantic": "Ошибка анализа новостей", "news": ""}
 
     @traceable
     def moex_news(self, state: State) -> dict:
@@ -129,10 +139,13 @@ class PortfolioAnalyzer:
     def make_trade_analysis(self, state: State) -> dict:
         """Технический анализ торговых данных"""
         if not self.modules_config.get("moex", {}).get("enabled", True):
-            return {"moex_data_analysis": "Модуль moex отключен"}
+            return {"moex_data_analysis": "Модуль moex отключен", "moex_data": ""}
         try:
             if state['moex_data'] == "Ошибка получения данных MOEX":
-                return {"moex_data_analysis": "Невозможно провести технический анализ"}
+                return {
+                    "moex_data_analysis": "Невозможно провести технический анализ",
+                    "moex_data": "",
+                }
 
             system_prompt = (
                 "Теханализ. Формат: Тренд, Объемы, Волатильность."
@@ -145,14 +158,14 @@ class PortfolioAnalyzer:
             user_prompt = f"Данные {state['ticker']}:\n{recent_data}"
 
             analysis = self.ai_service.call_model(system_prompt, user_prompt)
-            return {"moex_data_analysis": analysis}
+            return {"moex_data_analysis": analysis, "moex_data": ""}
 
         except APIError as e:
             logger.error(f"Trade analysis API error {state['ticker']}: {e}")
-            return {"moex_data_analysis": "Ошибка технического анализа"}
+            return {"moex_data_analysis": "Ошибка технического анализа", "moex_data": ""}
         except Exception as e:
             logger.error(f"Trade analysis error {state['ticker']}: {e}")
-            return {"moex_data_analysis": "Ошибка технического анализа"}
+            return {"moex_data_analysis": "Ошибка технического анализа", "moex_data": ""}
 
     @traceable
     def ifrs_analysis(self, state: State) -> dict:
