@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 from config import settings
 from services.ai_service import AIService
+from utils.helpers import APIError
 
 
 class TestAIService:
@@ -41,8 +42,13 @@ class TestAIService:
         """Тест обработки ошибок API"""
         mock_openai.return_value.chat.completions.create.side_effect = Exception("API Error")
 
-        result = deepseek_service.call_model("system", "user")
-        assert "Ошибка анализа" in result
+        with patch('time.sleep'):
+            with pytest.raises(APIError):
+                deepseek_service.call_model("system", "user")
+        assert (
+            mock_openai.return_value.chat.completions.create.call_count
+            == settings.max_retries
+        )
 
     @patch('services.ai_service.OpenAI')
     def test_call_model_deepseek_empty_response(self, mock_openai, deepseek_service):
@@ -71,7 +77,8 @@ class TestAIService:
         ]
         with patch('time.sleep'):
             result = deepseek_service.call_model("system", "user")
-            assert "Success after retry" in result or "Ошибка анализа" in result
+        assert result == "Success after retry"
+        assert mock_openai.return_value.chat.completions.create.call_count == 2
 
     @patch('services.ai_service.wrap_openai')
     @patch('services.ai_service.OpenAI')

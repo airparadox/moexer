@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 from services.ai_service import AIService
-from utils.helpers import extract_recommendation, extract_confidence
+from utils.helpers import APIError, extract_recommendation, extract_confidence
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,10 @@ class HedgeFundAgents:
                 response = self.ai_service.call_model(system_prompt, user_prompt)
                 votes[agent.name] = extract_recommendation(response)
                 confidences[agent.name] = extract_confidence(response)
+            except APIError as e:
+                logger.error(f"Agent {agent.name} API error: {e}")
+                votes[agent.name] = "ДЕРЖАТЬ"
+                confidences[agent.name] = 0.0
             except Exception as e:
                 logger.error(f"Agent {agent.name} failed: {e}")
                 votes[agent.name] = "ДЕРЖАТЬ"
