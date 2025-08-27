@@ -1,0 +1,232 @@
+import os
+from datetime import datetime
+import logging
+
+from models import RecommendationRecord
+from services import RecommendationDB, MOEXService
+from utils import get_performance_report, performance_monitor, APIError
+
+logger = logging.getLogger(__name__)
+
+
+def print_analysis_results(results: dict):
+    """Выводит результаты анализа в удобном формате"""
+    if "error" in results:
+        print(f"❌ Ошибка: {results['error']}")
+        return
+
+    summary = results["portfolio_summary"]
+    print("\n" + "=" * 60)
+    print("📊 СВОДКА ПО ПОРТФЕЛЮ")
+    print("=" * 60)
+    print(f"Всего позиций: {summary['total_positions']}")
+    print(f"К покупке: {summary['buy_recommendations']}")
+    print(f"Держать: {summary['hold_recommendations']}")
+    print(f"К продаже: {summary['sell_recommendations']}")
+    print(f"Средняя уверенность: {summary['average_confidence']:.2f}")
+    print(f"Общая стратегия: {summary['portfolio_action']}")
+    if 'risk_profile' in summary:
+        print(f"Тип инвестора: {summary['risk_profile']}")
+    if 'total_value' in summary:
+        print(f"Стоимость портфеля: {summary['total_value']:.2f} руб.")
+    if 'cash_rub' in summary:
+        print(f"Свободные средства: {summary['cash_rub']:.2f} руб.")
+
+    print("\n" + "=" * 60)
+    print("📈 ДЕТАЛЬНЫЙ АНАЛИЗ ПО ТИКЕРАМ")
+    print("=" * 60)
+
+    for ticker, data in results["analysis_results"].items():
+        print(f"\n🏢 {ticker}")
+        print(f"   Количество: {data['quantity']}")
+        print(f"   Решение: {data['decision']}...")
+        rebalancing = results["rebalancing_suggestions"].get(ticker, "Нет данных")
+        print(f"   Ребалансировка: {rebalancing}")
+        votes = data['details'].get('agent_votes', {})
+        if votes:
+            print("   Голоса агентов:")
+            for agent, vote in votes.items():
+                print(f"      {agent}: {vote}")
+        pmpt = data['details'].get('pmpt', {})
+        if pmpt:
+            print(f"   Downside risk: {pmpt.get('downside_risk', float('nan')):.4f}")
+            print(f"   Sortino ratio: {pmpt.get('sortino_ratio', float('nan')):.4f}")
+            print(f"   Omega ratio: {pmpt.get('omega_ratio', float('nan')):.4f}")
+
+    print("\n" + "=" * 60)
+    print("📋 ИТОГОВАЯ ТАБЛИЦА ДЕЙСТВИЙ")
+    print("=" * 60)
+    for ticker, action in results["rebalancing_suggestions"].items():
+        print(f"{ticker:<6} {action}")
+
+
+def save_recommendations_to_db(results: dict) -> None:
+    """Сохраняет рекомендации в локальную БД."""
+    db = RecommendationDB()
+    moex = MOEXService()
+    now = datetime.now()
+    for ticker, data in results.get("analysis_results", {}).items():
+        try:
+            price = moex.get_latest_price(ticker)
+        except APIError as e:
+            logger.error(f"Skipping {ticker}: {e}")
+            continue
+        record = RecommendationRecord(
+            ticker=ticker,
+            recommendation=data["recommendation"],
+            confidence=data["confidence"],
+            price=price,
+            timestamp=now,
+        )
+        db.save(record)
+    db.close()
+
+
+def generate_analysis_report(results: dict) -> str:
+    """Формирует текстовый отчет по результатам анализа."""
+    if "error" in results:
+        return f"❌ Ошибка: {results['error']}"
+
+    lines = []
+    summary = results["portfolio_summary"]
+    lines.append("=" * 60)
+    lines.append("📊 СВОДКА ПО ПОРТФЕЛЮ")
+    lines.append("=" * 60)
+    lines.append(f"Всего позиций: {summary['total_positions']}")
+    lines.append(f"К покупке: {summary['buy_recommendations']}")
+    lines.append(f"Держать: {summary['hold_recommendations']}")
+    lines.append(f"К продаже: {summary['sell_recommendations']}")
+    lines.append(f"Средняя уверенность: {summary['average_confidence']:.2f}")
+    lines.append(f"Общая стратегия: {summary['portfolio_action']}")
+    if "risk_profile" in summary:
+        lines.append(f"Тип инвестора: {summary['risk_profile']}")
+    if "total_value" in summary:
+        lines.append(f"Стоимость портфеля: {summary['total_value']:.2f} руб.")
+    if "cash_rub" in summary:
+        lines.append(f"Свободные средства: {summary['cash_rub']:.2f} руб.")
+
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("📈 ДЕТАЛЬНЫЙ АНАЛИЗ ПО ТИКЕРАМ")
+    lines.append("=" * 60)
+
+    for ticker, data in results["analysis_results"].items():
+        lines.append(f"\n🏢 {ticker}")
+        lines.append(f"   Количество: {data['quantity']}")
+        lines.append(f"   Решение: {data['decision']}...")
+        rebalancing = results["rebalancing_suggestions"].get(ticker, "Нет данных")
+        lines.append(f"   Ребалансировка: {rebalancing}")
+        pmpt = data['details'].get('pmpt', {})
+        if pmpt:
+            lines.append(f"   Downside risk: {pmpt.get('downside_risk', float('nan')):.4f}")
+            lines.append(f"   Sortino ratio: {pmpt.get('sortino_ratio', float('nan')):.4f}")
+            lines.append(f"   Omega ratio: {pmpt.get('omega_ratio', float('nan')):.4f}")
+
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("📋 ИТОГОВАЯ ТАБЛИЦА ДЕЙСТВИЙ")
+    lines.append("=" * 60)
+    for ticker, action in results["rebalancing_suggestions"].items():
+        lines.append(f"{ticker:<6} {action}")
+
+    return "\n".join(lines)
+
+
+def save_full_report(results: dict, start_time: datetime) -> str:
+    """Сохраняет полный отчет анализа и метрик в файл."""
+    analysis_report = generate_analysis_report(results)
+    performance_report = get_performance_report()
+    full_report = (
+        analysis_report
+        + "\n\n=== ОТЧЕТ О ПРОИЗВОИТЕЛЬНОСТИ ===\n"
+        + performance_report
+    )
+
+    os.makedirs("reports", exist_ok=True)
+    file_name = start_time.strftime("report_%Y%m%d_%H%M%S.txt")
+    path = os.path.join("reports", file_name)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(full_report)
+    return path
+
+
+def generate_html_report(results: dict) -> str:
+    """Создает HTML-отчет с таблицами по результатам анализа."""
+    if "error" in results:
+        return f"<html><body><h2>Ошибка</h2><p>{results['error']}</p></body></html>"
+
+    summary = results["portfolio_summary"]
+    html_parts = [
+        "<html><head><meta charset='utf-8'>",
+        "<meta name='viewport' content='width=device-width, initial-scale=1'><style>",
+        "body{max-width:800px;margin:0 auto;padding:10px;}",
+        "table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:4px;}th{background:#f0f0f0;}",
+        "</style></head><body>",
+        "<h1>📊 Сводка по портфелю</h1>",
+        "<table>",
+    ]
+
+    summary_rows = {
+        "Всего позиций": summary.get("total_positions"),
+        "К покупке": summary.get("buy_recommendations"),
+        "Держать": summary.get("hold_recommendations"),
+        "К продаже": summary.get("sell_recommendations"),
+        "Средняя уверенность": f"{summary.get('average_confidence', float('nan')):.2f}",
+        "Общая стратегия": summary.get("portfolio_action"),
+    }
+    if "risk_profile" in summary:
+        summary_rows["Тип инвестора"] = summary["risk_profile"]
+    if "total_value" in summary:
+        summary_rows["Стоимость портфеля"] = f"{summary['total_value']:.2f} руб."
+    if "cash_rub" in summary:
+        summary_rows["Свободные средства"] = f"{summary['cash_rub']:.2f} руб."
+
+    for key, value in summary_rows.items():
+        html_parts.append(f"<tr><th>{key}</th><td>{value}</td></tr>")
+    html_parts.append("</table>")
+
+    html_parts.extend(["<h1>📈 Детальный анализ по тикерам</h1>", "<table>",
+                       "<tr><th>Тикер</th><th>Количество</th><th>Решение</th><th>Ребалансировка</th><th>Downside risk</th><th>Sortino ratio</th><th>Omega ratio</th></tr>"])
+
+    for ticker, data in results["analysis_results"].items():
+        pmpt = data["details"].get("pmpt", {})
+        html_parts.append(
+            "<tr>" +
+            f"<td>{ticker}</td>" +
+            f"<td>{data['quantity']}</td>" +
+            f"<td>{data['decision']}</td>" +
+            f"<td>{results['rebalancing_suggestions'].get(ticker, 'Нет данных')}</td>" +
+            f"<td>{pmpt.get('downside_risk', float('nan')):.4f}</td>" +
+            f"<td>{pmpt.get('sortino_ratio', float('nan')):.4f}</td>" +
+            f"<td>{pmpt.get('omega_ratio', float('nan')):.4f}</td>" +
+            "</tr>"
+        )
+    html_parts.append("</table>")
+
+    metrics = performance_monitor.get_metrics_summary()
+    html_parts.extend(["<h1>📊 Отчет о производительности</h1>", "<table>",
+                       "<tr><th>Сервис</th><th>Среднее время</th><th>Процент успеха</th><th>Количество вызовов</th></tr>"])
+
+    for service, data in metrics.get("services", {}).items():
+        html_parts.append(
+            "<tr>" +
+            f"<td>{service}</td>" +
+            f"<td>{data['average_execution_time']:.3f}s</td>" +
+            f"<td>{data['success_rate']:.1f}%</td>" +
+            f"<td>{data['total_calls']}</td>" +
+            "</tr>"
+        )
+    html_parts.append("</table></body></html>")
+
+    return "".join(html_parts)
+
+
+def save_html_report(results: dict, start_time: datetime) -> str:
+    """Сохраняет отчет в формате HTML."""
+    html_report = generate_html_report(results)
+    os.makedirs("reports", exist_ok=True)
+    file_name = start_time.strftime("report_%Y%m%d_%H%M%S.html")
+    path = os.path.join("reports", file_name)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html_report)
+    return path

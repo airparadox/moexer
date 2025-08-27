@@ -1,5 +1,5 @@
 import pytest
-from main import generate_html_report
+from reports import generate_html_report
 
 
 def test_generate_html_report_contains_tables():
