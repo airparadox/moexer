@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     deepseek_api_key: str | None = os.getenv("DEEPSEEK_API_KEY")
     deepseek_model: str = "deepseek-chat"
     deepseek_base_url: str = "https://api.deepseek.com"
+    openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    openai_base_url: str | None = os.getenv("OPENAI_BASE_URL")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3:8b")
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     
