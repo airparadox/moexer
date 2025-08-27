@@ -133,10 +133,25 @@ class MOEXService:
             sec = data.get("securities", {})
             if not sec:
                 raise ValueError("No data returned")
+
             df = pd.DataFrame(sec["data"], columns=sec["columns"])
-            df = df[["SECID", "PREVCLOSE"]].rename(
-                columns={"SECID": "ticker", "PREVCLOSE": "price"}
-            )
+
+            price_columns = [
+                "PREVCLOSE",
+                "PREVPRICE",
+                "PREVADMITTEDQUOTE",
+                "CLOSEPRICE",
+                "LAST",
+            ]
+            for col in price_columns:
+                if col in df.columns:
+                    df = df[["SECID", col]].rename(
+                        columns={"SECID": "ticker", col: "price"}
+                    )
+                    break
+            else:
+                raise KeyError("No known price column found")
+
             df["ticker"] = df["ticker"].str.upper()
             return df.set_index("ticker")
         except Exception as e:
