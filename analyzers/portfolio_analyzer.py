@@ -1,7 +1,7 @@
 import logging
 import os
 from typing import Dict, Optional
-from langsmith import traceable
+from langfuse import observe
 from langgraph.graph import StateGraph, START, END
 from io import StringIO
 import pandas as pd
@@ -50,7 +50,7 @@ class PortfolioAnalyzer:
         self.weights = {k: v["weight"] for k, v in self.modules_config.items()}
         self._market_news_cache: Optional[str] = None
     
-    @traceable
+    @observe()
     def generate_market_news(self, state: State) -> dict:
         """Получение и анализ новостей с lenta.ru"""
         if not self.modules_config.get("market_news", {}).get("enabled", True):
@@ -83,7 +83,7 @@ class PortfolioAnalyzer:
             self._market_news_cache = msg
             return {"market_news": msg}
 
-    @traceable
+    @observe()
     def generate_news(self, state: State) -> dict:
         """Получение новостей по тикеру"""
         if not self.modules_config.get("social", {}).get("enabled", True):
@@ -98,7 +98,7 @@ class PortfolioAnalyzer:
             logger.error(f"News error {state['ticker']}: {e}")
             return {"news": []}
 
-    @traceable
+    @observe()
     def grade_news(self, state: State) -> dict:
         """Анализ новостей компании"""
         if not self.modules_config.get("social", {}).get("enabled", True):
@@ -120,7 +120,7 @@ class PortfolioAnalyzer:
             logger.error(f"Grade error {state['ticker']}: {e}")
             return {"semantic": "Ошибка анализа новостей", "news": ""}
 
-    @traceable
+    @observe()
     def moex_news(self, state: State) -> dict:
         """Получение данных MOEX"""
         if not self.modules_config.get("moex", {}).get("enabled", True):
@@ -135,7 +135,7 @@ class PortfolioAnalyzer:
             logger.error(f"MOEX error {state['ticker']}: {e}")
             return {"moex_data": "Ошибка получения данных MOEX"}
 
-    @traceable
+    @observe()
     def make_trade_analysis(self, state: State) -> dict:
         """Технический анализ торговых данных"""
         if not self.modules_config.get("moex", {}).get("enabled", True):
@@ -167,7 +167,7 @@ class PortfolioAnalyzer:
             logger.error(f"Trade analysis error {state['ticker']}: {e}")
             return {"moex_data_analysis": "Ошибка технического анализа", "moex_data": ""}
 
-    @traceable
+    @observe()
     def ifrs_analysis(self, state: State) -> dict:
         """Анализ IFRS отчетности"""
         if not self.modules_config.get("ifrs", {}).get("enabled", True):
@@ -194,7 +194,7 @@ class PortfolioAnalyzer:
             logger.error(f"IFRS error {state['ticker']}: {e}")
             return {"ifrs_data": "Ошибка анализа МСФО"}
 
-    @traceable
+    @observe()
 
     def final_analysis(self, state: State) -> dict:
         """Финальный анализ и рекомендация"""

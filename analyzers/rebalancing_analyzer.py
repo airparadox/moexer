@@ -2,7 +2,7 @@ import logging
 from typing import Callable, Dict, List
 
 import pandas as pd
-from langsmith import traceable
+from langfuse import observe
 
 from models.state import AnalysisResult, Portfolio, RiskProfile
 from services.moex_service import MOEXService
@@ -24,7 +24,7 @@ class RebalancingAnalyzer:
         """
         self.price_getter = price_getter or MOEXService().get_latest_prices
 
-    @traceable
+    @observe()
     def suggest_rebalancing(
         self,
         analysis_results: Dict[str, AnalysisResult],

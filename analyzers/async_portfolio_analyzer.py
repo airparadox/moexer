@@ -5,7 +5,6 @@ from typing import Dict, Tuple
 from config import settings
 
 from langgraph.graph import StateGraph, START, END
-from langsmith import traceable
 
 from models.state import (
     State,
