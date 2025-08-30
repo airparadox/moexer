@@ -68,6 +68,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 # Опционально: включение трасировки Langfuse
 LANGFUSE_PUBLIC_KEY=your_langfuse_public_key
 LANGFUSE_SECRET_KEY=your_langfuse_secret_key
+LANGFUSE_HOST=http://localhost:3030
 ```
 Дополнительные переменные могут быть заданы по желанию. Неизвестные
 переменные будут просто игнорироваться при загрузке настроек.

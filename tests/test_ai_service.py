@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from unittest.mock import Mock, patch
 
@@ -100,6 +102,20 @@ class TestAIService:
             settings.llm_provider = 'deepseek'
             service = AIService()
             service.call_model("sys", "usr")
+        mock_register.assert_called_once()
+
+    @patch('services.ai_service.OpenAI')
+    @patch('services.ai_service.langfuse_openai.register_tracing')
+    def test_langfuse_host_default_set(self, mock_register, mock_openai, monkeypatch):
+        """Проверяем установку LANGFUSE_HOST по умолчанию"""
+        monkeypatch.setenv('DEEPSEEK_API_KEY', 'test_key')
+        monkeypatch.setattr(settings, 'llm_provider', 'deepseek')
+        monkeypatch.setenv('LANGFUSE_PUBLIC_KEY', 'pk')
+        monkeypatch.setenv('LANGFUSE_SECRET_KEY', 'sk')
+        monkeypatch.delenv('LANGFUSE_HOST', raising=False)
+        service = AIService()
+        service._ensure_client()
+        assert os.environ['LANGFUSE_HOST'] == settings.langfuse_host
         mock_register.assert_called_once()
 
     @patch('ollama.Client')

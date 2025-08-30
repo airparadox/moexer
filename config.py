@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     openai_base_url: str | None = os.getenv("OPENAI_BASE_URL")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3:8b")
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+    # Langfuse configuration
+    langfuse_host: str = os.getenv("LANGFUSE_HOST", "http://localhost:3030")
     
     # Параметры анализа
     news_days_lookback: int = 1
