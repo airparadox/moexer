@@ -37,6 +37,7 @@ class AIService:
         if self.client is None:
             if self.provider in {"deepseek", "openai"}:
                 if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+                    os.environ.setdefault("LANGFUSE_HOST", settings.langfuse_host)
                     langfuse_openai.register_tracing()
             if self.provider == "deepseek":
                 client = OpenAI(
