@@ -87,16 +87,20 @@ class TestAIService:
         assert result == "Success after retry"
         assert mock_openai.return_value.chat.completions.create.call_count == 2
 
-    @patch('services.ai_service.wrap_openai')
+    @patch('services.ai_service.langfuse_openai.register_tracing')
     @patch('services.ai_service.OpenAI')
-    def test_wrap_openai_called_when_langsmith_enabled(self, mock_openai, mock_wrap):
-        """Проверяем, что wrap_openai вызывается при активном LangSmith"""
+    def test_register_tracing_called_when_langfuse_enabled(self, mock_openai, mock_register):
+        """Проверяем, что register_tracing вызывается при активном Langfuse"""
         mock_openai.return_value.chat.completions.create.return_value = Mock(choices=[Mock(message=Mock(content="resp"))])
-        with patch.dict('os.environ', {'DEEPSEEK_API_KEY': 'test_key', 'LANGCHAIN_API_KEY': 'ls_key'}):
+        with patch.dict('os.environ', {
+            'DEEPSEEK_API_KEY': 'test_key',
+            'LANGFUSE_PUBLIC_KEY': 'pk',
+            'LANGFUSE_SECRET_KEY': 'sk',
+        }):
             settings.llm_provider = 'deepseek'
             service = AIService()
             service.call_model("sys", "usr")
-        mock_wrap.assert_called_once()
+        mock_register.assert_called_once()
 
     @patch('ollama.Client')
     def test_call_model_ollama_success(self, mock_client, ollama_service):

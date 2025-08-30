@@ -65,8 +65,9 @@ OPENAI_MODEL=gpt-4o-mini
 OLLAMA_MODEL=llama3:8b
 OLLAMA_BASE_URL=http://localhost:11434
 
-# Опционально: включение трасировки LangSmith
-LANGCHAIN_API_KEY=your_langsmith_key
+# Опционально: включение трасировки Langfuse
+LANGFUSE_PUBLIC_KEY=your_langfuse_public_key
+LANGFUSE_SECRET_KEY=your_langfuse_secret_key
 ```
 Дополнительные переменные могут быть заданы по желанию. Неизвестные
 переменные будут просто игнорироваться при загрузке настроек.

@@ -3,7 +3,7 @@ import os
 from typing import Optional, Any
 
 from openai import OpenAI
-from langsmith.wrappers import wrap_openai
+import langfuse.openai as langfuse_openai
 
 from config import settings
 from utils.helpers import retry_on_failure, APIError
@@ -35,21 +35,20 @@ class AIService:
 
     def _ensure_client(self):
         if self.client is None:
+            if self.provider in {"deepseek", "openai"}:
+                if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+                    langfuse_openai.register_tracing()
             if self.provider == "deepseek":
                 client = OpenAI(
                     api_key=self.api_key,
                     base_url=settings.deepseek_base_url,
                 )
-                if os.getenv("LANGCHAIN_API_KEY") or os.getenv("LANGSMITH_API_KEY"):
-                    client = wrap_openai(client)
                 self.client = client
             elif self.provider == "openai":
                 kwargs = {"api_key": self.api_key}
                 if settings.openai_base_url:
                     kwargs["base_url"] = settings.openai_base_url
                 client = OpenAI(**kwargs)
-                if os.getenv("LANGCHAIN_API_KEY") or os.getenv("LANGSMITH_API_KEY"):
-                    client = wrap_openai(client)
                 self.client = client
             elif self.provider == "ollama":
                 from ollama import Client as OllamaClient
