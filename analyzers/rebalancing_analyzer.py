@@ -100,14 +100,28 @@ class RebalancingAnalyzer:
 
         if not buy_df.empty:
             adjusted_prices = buy_df["price"] * (1 + self.BROKER_FEE)
-            base_quantities = (cash / len(buy_df) / adjusted_prices).astype(int)
+
+            confidences = pd.Series(
+                {t: analysis_results[t].confidence for t in buy_df.index},
+                index=buy_df.index,
+            )
+            # Распределяем базовые средства пропорционально уверенности
+            total_conf = confidences.sum()
+            if total_conf > 0:
+                weights = confidences / total_conf
+            else:
+                weights = pd.Series(1 / len(buy_df), index=buy_df.index)
+
+            base_quantities = (cash * weights / adjusted_prices).astype(int)
             spent = (base_quantities * adjusted_prices).sum()
             cash_remaining = cash - spent
 
             additional = pd.Series(0, index=buy_df.index, dtype=int)
-            for ticker, price in adjusted_prices.sort_values().items():
+            # Оставшиеся деньги направляем в тикеры с большей уверенностью
+            for ticker in confidences.sort_values(ascending=False).index:
+                price = adjusted_prices[ticker]
                 if cash_remaining < price:
-                    break
+                    continue
                 qty = int(cash_remaining / price)
                 additional[ticker] = qty
                 cash_remaining -= qty * price

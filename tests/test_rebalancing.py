@@ -65,6 +65,25 @@ def test_rebalancing_zero_quantity_sell():
     assert "AAA" not in result
 
 
+def test_rebalancing_considers_confidence():
+    portfolio = Portfolio.from_dict({"AAA": 0, "BBB": 0, "RUB": 10000})
+    analysis_results = {
+        "AAA": AnalysisResult(
+            ticker="AAA", recommendation="КУПИТЬ", confidence=1.0, analysis_data={}
+        ),
+        "BBB": AnalysisResult(
+            ticker="BBB", recommendation="КУПИТЬ", confidence=0.5, analysis_data={}
+        ),
+    }
+
+    price_df = pd.DataFrame({"price": [1000.0, 1000.0]}, index=["AAA", "BBB"])
+    analyzer = RebalancingAnalyzer(price_getter=lambda ts: price_df.loc[ts])
+    result = analyzer.suggest_rebalancing(analysis_results, portfolio)
+
+    assert result["AAA"] == "Купить 6"
+    assert result["BBB"] == "Купить 3"
+
+
 def test_rebalancing_many_assets_performance():
     tickers = [f"T{i:03d}" for i in range(200)]
     portfolio_data = {t: 0 for t in tickers}
