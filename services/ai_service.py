@@ -1,6 +1,7 @@
 import logging
 import os
-from typing import Optional, Any
+import json
+from typing import Optional, Any, List, Dict, Callable
 
 from openai import OpenAI
 import langfuse.openai as langfuse_openai
@@ -98,3 +99,51 @@ class AIService:
         except Exception as e:
             logger.error(f"{self.provider.capitalize()} API error: {e}")
             raise APIError(f"{self.provider.capitalize()} API error: {e}") from e
+
+    def call_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: List[Dict[str, Any]],
+        tool_funcs: Dict[str, Callable],
+    ) -> str:
+        """Вызов модели с поддержкой tools по аналогии с OpenAI function calling."""
+        self._ensure_client()
+        if self.provider not in {"deepseek", "openai"}:
+            raise ValueError("Tool calling supported only for OpenAI or DeepSeek providers")
+
+        model = settings.deepseek_model if self.provider == "deepseek" else settings.openai_model
+
+        response = self.client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools,
+        )
+        message = response.choices[0].message
+
+        while getattr(message, "tool_calls", None):
+            for call in message.tool_calls:
+                func = tool_funcs.get(call.function.name)
+                if not func:
+                    result = f"unknown tool {call.function.name}"
+                else:
+                    args = json.loads(call.function.arguments or "{}")
+                    try:
+                        result = func(**args)
+                    except Exception as e:  # pragma: no cover - simple wrapper
+                        logger.error(f"Tool {call.function.name} failed: {e}")
+                        result = "Ошибка выполнения"
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": str(result),
+                    }
+                )
+
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+            )
+            message = response.choices[0].message
+
+        return message.content

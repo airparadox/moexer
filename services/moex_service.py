@@ -170,3 +170,46 @@ class MOEXService:
         except Exception as e:
             logger.error(f"Failed to get returns for {ticker}: {e}")
             raise APIError(f"Failed to get returns for {ticker}: {e}")
+
+    @retry_on_failure(max_retries=settings.max_retries)
+    def get_candles(
+        self,
+        ticker: str,
+        interval: str = "day",
+        limit: int = 30,
+    ) -> pd.DataFrame:
+        """Возвращает свечные данные по тикеру.
+
+        Args:
+            ticker: Биржевой тикер.
+            interval: Таймфрейм свечей. Допустимые значения: ``"1min"``,
+                ``"10min"``, ``"hour"``, ``"day"``.
+            limit: Количество свечей.
+
+        Returns:
+            DataFrame со свечами.
+
+        Raises:
+            APIError: Если данные не удалось получить.
+        """
+        interval_map = {"1min": 1, "10min": 10, "hour": 60, "day": 24}
+        try:
+            code = interval_map.get(interval)
+            if code is None:
+                raise ValueError(f"Unsupported interval: {interval}")
+
+            url = (
+                "https://iss.moex.com/iss/engines/stock/markets/shares/"
+                f"securities/{ticker}/candles.json"
+            )
+            params = {"interval": code, "limit": limit}
+            with requests.Session() as session:
+                resp = session.get(url, params=params, timeout=settings.api_timeout)
+                resp.raise_for_status()
+                data = resp.json().get("candles", {})
+
+            df = pd.DataFrame(data.get("data", []), columns=data.get("columns", []))
+            return df
+        except Exception as e:
+            logger.error(f"Failed to get candles for {ticker}: {e}")
+            raise APIError(f"Failed to get candles for {ticker}: {e}")
