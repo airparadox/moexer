@@ -1,11 +1,22 @@
 import logging
 import os
 from typing import Dict, Optional
+# ❗ Жёстко указываем OTEL endpoint на локальный Langfuse
+os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000/api/public/otel"
+os.environ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf"
+
+# Можно дополнительно отключить retries
+os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = "http://localhost:3000/api/public/otel/v1/traces"
+
+# (по желанию) чтобы точно не было cloud fallback
+os.environ["LANGFUSE_HOST"] = "http://localhost:3000"
+from langfuse import Langfuse
 from langfuse import observe
 from langgraph.graph import StateGraph, START, END
 from io import StringIO
 import pandas as pd
-
+# Включение декораторов
+os.environ["LANGFUSE_ENABLE"] = "true"
 from models.state import State, Portfolio, AnalysisResult, RiskProfile
 from services.ai_service import AIService
 from services.news_service import NewsService
@@ -19,6 +30,16 @@ from utils.helpers import (
 )
 from utils.pmpt import pmpt_metrics
 from config import get_modules_config
+
+
+# ✅ ЖЁСТКО указываем локальный Langfuse
+langfuse = None
+if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+    langfuse = Langfuse(
+        host="http://localhost:3000",
+        public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+        secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    )
 
 logger = logging.getLogger(__name__)
 

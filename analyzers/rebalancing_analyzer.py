@@ -1,20 +1,45 @@
 import logging
 from typing import Callable, Dict, List
-
+import os
 import pandas as pd
-from langfuse import observe
 
+
+# ❗ Жёстко указываем OTEL endpoint на локальный Langfuse
+os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000/api/public/otel"
+os.environ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf"
+
+# Можно дополнительно отключить retries
+os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = "http://localhost:3000/api/public/otel/v1/traces"
+
+# (по желанию) чтобы точно не было cloud fallback
+os.environ["LANGFUSE_HOST"] = "http://localhost:3000"
+
+
+from langfuse import observe
+from langfuse import Langfuse
 from models.state import AnalysisResult, Portfolio, RiskProfile
 from services.moex_service import MOEXService
 
+
+
 logger = logging.getLogger(__name__)
+
+# ✅ ЖЁСТКО указываем локальный Langfuse
+langfuse = None
+if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+    langfuse = Langfuse(
+        host="http://localhost:3000",
+        public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+        secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    )
+
 
 class RebalancingAnalyzer:
     """Анализатор для предложений по ребалансировке портфеля"""
     
     BROKER_FEE = 0.0006  # 0.06%
     TAX_RATE = 0.15  # 15%
-
+    @observe()
     def __init__(self, price_getter: Callable[[List[str]], pd.DataFrame] | None = None):
         """Initialize analyzer.
 
@@ -125,7 +150,7 @@ class RebalancingAnalyzer:
         rebalancing_suggestions["RUB"] = f"Остаток {int(round(cash))}"
 
         return rebalancing_suggestions
-    
+    @observe()
     def _get_confidence_text(self, confidence: float) -> str:
         """Преобразует уровень уверенности в текстовое описание"""
         if confidence >= 0.8:
@@ -136,7 +161,7 @@ class RebalancingAnalyzer:
             return "Низкая уверенность"
         else:
             return "Данные неполные"
-    
+    @observe()
     def get_portfolio_summary(
         self, analysis_results: Dict[str, AnalysisResult], portfolio: Portfolio
     ) -> Dict[str, any]:

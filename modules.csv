@@ -1,5 +1,5 @@
 # name,enabled,weight
-ifrs,1,0.55
-market_news,1,0.20
-moex,1,0.15
-social,1,0.10
+ifrs,1,0.6
+market_news,1,0.05
+moex,1,0.3
+social,1,0.05

@@ -26,7 +26,7 @@ class NewsService:
             APIError: При ошибках получения новостей
         """
         try:
-            feed = feedparser.parse('https://lenta.ru/rss/news')
+            feed = feedparser.parse('https://www.finam.ru/analysis/conews/rsspoint/')   #https://lenta.ru/rss/news
             news_entries = []
             cutoff_time = datetime.now(timezone.utc) - timedelta(days=settings.news_days_lookback)
 

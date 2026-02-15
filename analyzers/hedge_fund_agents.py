@@ -1,11 +1,26 @@
 import logging
 from dataclasses import dataclass
 from typing import Dict, List
+import os
 
 from services.ai_service import AIService
 from utils.helpers import APIError, extract_recommendation, extract_confidence
 
 logger = logging.getLogger(__name__)
+
+# ❗ Жёстко указываем OTEL endpoint на локальный Langfuse
+os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000/api/public/otel"
+os.environ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf"
+
+# Можно дополнительно отключить retries
+os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = "http://localhost:3000/api/public/otel/v1/traces"
+
+# (по желанию) чтобы точно не было cloud fallback
+os.environ["LANGFUSE_HOST"] = "http://localhost:3000"
+
+
+from langfuse import observe
+from langfuse import Langfuse
 
 @dataclass
 class InvestorAgent:
@@ -15,7 +30,7 @@ class InvestorAgent:
 
 class HedgeFundAgents:
     """Простая реализация мультиагентного анализа, вдохновлённая проектом AI Hedge Fund."""
-
+    @observe()
     def __init__(self, ai_service: AIService):
         self.ai_service = ai_service
         self.agents: List[InvestorAgent] = [
@@ -53,7 +68,7 @@ class HedgeFundAgents:
                 ),
             ),
         ]
-
+    @observe()
     def analyze(self, ticker: str, summary: str) -> tuple[Dict[str, str], Dict[str, float]]:
         """Возвращает рекомендации и уверенности каждого агента."""
         votes: Dict[str, str] = {}

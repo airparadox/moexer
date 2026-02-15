@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     # Параметры анализа
     news_days_lookback: int = 1
     moex_days_lookback: int = 180
-    max_news_items: int = 3
-    max_ifrs_content_length: int = 1500
+    max_news_items: int = 100
+    max_ifrs_content_length: int = 15000
 
     # Лимиты API
     api_timeout: int = 30
