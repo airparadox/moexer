@@ -17,10 +17,21 @@ os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = "http://localhost:3000/api/pu
 
 # (по желанию) чтобы точно не было cloud fallback
 os.environ["LANGFUSE_HOST"] = "http://localhost:3000"
+# Включаем сбор данных для observe-декоратора
+os.environ["LANGFUSE_ENABLE"] = "true"
 
 
 from langfuse import observe
 from langfuse import Langfuse
+
+
+langfuse = None
+if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+    langfuse = Langfuse(
+        host="http://localhost:3000",
+        public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+        secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    )
 
 @dataclass
 class InvestorAgent:
@@ -73,9 +84,23 @@ class HedgeFundAgents:
         """Возвращает рекомендации и уверенности каждого агента."""
         votes: Dict[str, str] = {}
         confidences: Dict[str, float] = {}
-        for agent in self.agents:
-            try:
-                system_prompt = (
+        trace = None
+
+        if langfuse:
+            trace = langfuse.trace(
+                name="hedge-fund-agents",
+                input={
+                    "ticker": ticker,
+                    "summary": summary,
+                    "agents": [agent.name for agent in self.agents],
+                },
+            )
+
+        try:
+            for agent in self.agents:
+                agent_span = trace.span(name=f"agent-{agent.name}") if trace else None
+                try:
+                    system_prompt = (
                     f"Ты выступаешь как {agent.name} — {agent.description}."
                     f"Но ты НЕ можешь ссылаться на свою репутацию или прошлые кейсы; решение принимается ТОЛЬКО по предоставленным данным и весам источников."
                     f"В начале ответа выведи РОВНО ОДНО слово (большими буквами):"
@@ -93,16 +118,35 @@ class HedgeFundAgents:
                     f"3) Не выдумывай фактов. Если чего-то не хватает — понижай уверенность."
                 )
 
-                user_prompt = f"Анализ по {ticker}:\n{summary}"
-                response = self.ai_service.call_model(system_prompt, user_prompt)
-                votes[agent.name] = extract_recommendation(response)
-                confidences[agent.name] = extract_confidence(response)
-            except APIError as e:
-                logger.error(f"Agent {agent.name} API error: {e}")
-                votes[agent.name] = "ДЕРЖАТЬ"
-                confidences[agent.name] = 0.0
-            except Exception as e:
-                logger.error(f"Agent {agent.name} failed: {e}")
-                votes[agent.name] = "ДЕРЖАТЬ"
-                confidences[agent.name] = 0.0
+                    user_prompt = f"Анализ по {ticker}:\n{summary}"
+                    response = self.ai_service.call_model(system_prompt, user_prompt)
+                    votes[agent.name] = extract_recommendation(response)
+                    confidences[agent.name] = extract_confidence(response)
+
+                    if agent_span:
+                        agent_span.end(
+                            output={
+                                "recommendation": votes[agent.name],
+                                "confidence": confidences[agent.name],
+                            }
+                        )
+                except APIError as e:
+                    logger.error(f"Agent {agent.name} API error: {e}")
+                    votes[agent.name] = "ДЕРЖАТЬ"
+                    confidences[agent.name] = 0.0
+                    if agent_span:
+                        agent_span.end(output={"error": str(e)})
+                except Exception as e:
+                    logger.error(f"Agent {agent.name} failed: {e}")
+                    votes[agent.name] = "ДЕРЖАТЬ"
+                    confidences[agent.name] = 0.0
+                    if agent_span:
+                        agent_span.end(output={"error": str(e)})
+
+            if trace:
+                trace.update(output={"votes": votes, "confidences": confidences})
+        finally:
+            if langfuse:
+                langfuse.flush()
+
         return votes, confidences
