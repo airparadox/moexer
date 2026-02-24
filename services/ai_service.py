@@ -1,110 +1,96 @@
 import logging
 import os
-import json
 from typing import Optional, Any, List, Dict, Callable
 
-# ❗ Жёстко указываем OTEL endpoint на локальный Langfuse
-os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000/api/public/otel"
-os.environ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf"
+from openai import OpenAI
 
-# Можно дополнительно отключить retries
-os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = "http://localhost:3000/api/public/otel/v1/traces"
-
-# (по желанию) чтобы точно не было cloud fallback
-os.environ["LANGFUSE_HOST"] = "http://localhost:3000"
-
-
-from langfuse import Langfuse
 from config import settings
 from utils.helpers import retry_on_failure, APIError
 from utils.monitoring import monitor_performance
 
-logger = logging.getLogger(__name__)
+try:
+    from langfuse import openai as langfuse_openai
+except Exception:  # pragma: no cover - fallback for environments without langfuse
+    class _LangfuseOpenAIStub:
+        @staticmethod
+        def register_tracing(*args, **kwargs):
+            return None
 
-# ✅ ЖЁСТКО указываем локальный Langfuse
-langfuse = None
-if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
-    langfuse = Langfuse(
-        host="http://localhost:3000",
-        public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-        secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-    )
+    langfuse_openai = _LangfuseOpenAIStub()
+
+logger = logging.getLogger(__name__)
 
 
 class AIService:
-    """Сервис для работы с LLM провайдерами (DeepSeek, OpenAI или локальная Ollama)"""
+    """Сервис для работы с LLM провайдерами (DeepSeek, OpenAI или локальная Ollama)."""
 
     def __init__(self, api_key: Optional[str] = None):
         self.provider = settings.llm_provider.lower()
-
-        if self.provider != "ollama":
-            raise ValueError("Этот сервис сейчас настроен только для ollama")
-
         self.client: Optional[Any] = None
+        self.api_key = api_key
+
+        if self.provider == "deepseek":
+            self.api_key = api_key or settings.deepseek_api_key or os.getenv("DEEPSEEK_API_KEY")
+            if not self.api_key:
+                raise ValueError("DEEPSEEK_API_KEY must be set")
+        elif self.provider == "openai":
+            self.api_key = api_key or settings.openai_api_key or os.getenv("OPENAI_API_KEY")
+            if not self.api_key:
+                raise ValueError("OPENAI_API_KEY must be set")
+        elif self.provider == "ollama":
+            self.api_key = None
+        else:
+            raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
     def _ensure_client(self):
-        if self.client is None:
+        if self.client is not None:
+            return
+
+        if self.provider == "ollama":
             from ollama import Client as OllamaClient
+
             self.client = OllamaClient(host=settings.ollama_base_url)
+            return
+
+        base_url = settings.deepseek_base_url if self.provider == "deepseek" else settings.openai_base_url
+        if base_url and not base_url.rstrip("/").endswith("/v1"):
+            base_url = f"{base_url.rstrip('/')}/v1"
+
+        self.client = OpenAI(api_key=self.api_key, base_url=base_url)
+
+        if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+            os.environ.setdefault("LANGFUSE_HOST", settings.langfuse_host)
+            langfuse_openai.register_tracing()
 
     @monitor_performance("ai_service")
     @retry_on_failure(max_retries=settings.max_retries)
     def call_model(self, system_prompt: str, user_prompt: str) -> str:
-        """Вызов Ollama с отправкой трейса в локальный Langfuse"""
         self._ensure_client()
 
         try:
-            trace = None
-            generation = None
-
-            # ✅ Создаём trace если Langfuse включён
-            if langfuse:
-                trace = langfuse.trace(
-                    name="ollama-call",
-                    input={
-                        "system_prompt": system_prompt,
-                        "user_prompt": user_prompt,
-                    },
-                )
-
-                generation = trace.generation(
-                    name=settings.ollama_model,
+            if self.provider == "ollama":
+                response = self.client.chat(
                     model=settings.ollama_model,
-                    input=[
+                    messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
                 )
+                return response["message"]["content"]
 
-            # 🔹 Вызов Ollama
-            response = self.client.chat(
-                model=settings.ollama_model,
+            model = settings.deepseek_model if self.provider == "deepseek" else settings.openai_model
+            response = self.client.chat.completions.create(
+                model=model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
             )
-
-            output_text = response["message"]["content"]
-
-            # ✅ Завершаем generation
-            if generation:
-                generation.end(
-                    output=output_text,
-                )
-
-            return output_text
+            return response.choices[0].message.content or ""
 
         except Exception as e:
-            logger.error(f"Ollama API error: {e}")
-
-            if langfuse:
-                langfuse.event(
-                    name="ollama-error",
-                    input={"error": str(e)},
-                )
-
-            raise APIError(f"Ollama API error: {e}") from e
+            logger.error("%s API error: %s", self.provider, e)
+            raise APIError(f"{self.provider} API error: {e}") from e
 
     def call_with_tools(
         self,
@@ -112,4 +98,4 @@ class AIService:
         tools: List[Dict[str, Any]],
         tool_funcs: Dict[str, Callable],
     ) -> str:
-        raise ValueError("Tool calling не реализован для Ollama")
+        raise ValueError("Tool calling не реализован")

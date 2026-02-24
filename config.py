@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
     # Langfuse configuration
-    langfuse_host: str = os.getenv("LANGFUSE_HOST", "http://localhost:3030")
+    langfuse_host: str = os.getenv("LANGFUSE_HOST", "http://localhost:3000")
     
     # Параметры анализа
     news_days_lookback: int = 1
