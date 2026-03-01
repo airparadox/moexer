@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class AIService:
-    """Сервис для работы с LLM провайдерами (DeepSeek, OpenAI или локальная Ollama)."""
+    """Сервис для работы с LLM провайдерами (DeepSeek, OpenAI, OpenRouter или локальная Ollama)."""
 
     def __init__(self, api_key: Optional[str] = None):
         self.provider = settings.llm_provider.lower()
@@ -37,6 +37,10 @@ class AIService:
             self.api_key = api_key or settings.openai_api_key or os.getenv("OPENAI_API_KEY")
             if not self.api_key:
                 raise ValueError("OPENAI_API_KEY must be set")
+        elif self.provider == "openrouter":
+            self.api_key = api_key or settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
+            if not self.api_key:
+                raise ValueError("OPENROUTER_API_KEY must be set")
         elif self.provider == "ollama":
             self.api_key = None
         else:
@@ -52,7 +56,15 @@ class AIService:
             self.client = OllamaClient(host=settings.ollama_base_url)
             return
 
-        base_url = settings.deepseek_base_url if self.provider == "deepseek" else settings.openai_base_url
+        if self.provider == "deepseek":
+            base_url = settings.deepseek_base_url
+        elif self.provider == "openai":
+            base_url = settings.openai_base_url
+        elif self.provider == "openrouter":
+            base_url = settings.openrouter_base_url
+        else:
+            base_url = None
+            
         if base_url and not base_url.rstrip("/").endswith("/v1"):
             base_url = f"{base_url.rstrip('/')}/v1"
 
@@ -78,7 +90,14 @@ class AIService:
                 )
                 return response["message"]["content"]
 
-            model = settings.deepseek_model if self.provider == "deepseek" else settings.openai_model
+            if self.provider == "deepseek":
+                model = settings.deepseek_model
+            elif self.provider == "openai":
+                model = settings.openai_model
+            elif self.provider == "openrouter":
+                model = settings.openrouter_model
+            else:
+                raise ValueError(f"Unsupported LLM provider: {self.provider}")
             response = self.client.chat.completions.create(
                 model=model,
                 messages=[
