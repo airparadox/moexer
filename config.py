@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     openai_base_url: str | None = os.getenv("OPENAI_BASE_URL")
+    openrouter_api_key: str | None = os.getenv("OPENROUTER_API_KEY")
+    openrouter_model: str = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3:8b")
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 

@@ -51,7 +51,7 @@ pip install -r requirements.txt
 
 Создайте файл `.env` и укажите необходимые ключи и настройки:
 ```env
-LLM_PROVIDER=deepseek                 # или 'ollama' или 'openai'
+LLM_PROVIDER=deepseek                 # или 'ollama', 'openai' или 'openrouter'
 
 # DeepSeek
 DEEPSEEK_API_KEY=your_actual_key
@@ -60,6 +60,10 @@ DEEPSEEK_MODEL=deepseek-reasoner или deepseek-chat
 # OpenAI
 OPENAI_API_KEY=your_openai_key
 OPENAI_MODEL=gpt-4o-mini
+
+# OpenRouter
+OPENROUTER_API_KEY=your_openrouter_key
+OPENROUTER_MODEL=openai/gpt-4o-mini
 
 # Локальная Ollama
 OLLAMA_MODEL=llama3:8b
